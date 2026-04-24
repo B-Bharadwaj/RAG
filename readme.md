@@ -1,5 +1,3 @@
-"""
-
 # AI Business Report Analyzer — v2
 
 ---
