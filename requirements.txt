@@ -1,0 +1,35 @@
+# ── Core ───────────────────────────────────────────────
+streamlit
+fastapi
+uvicorn
+python-dotenv
+groq
+
+# ── Data Processing ────────────────────────────────────
+pandas
+openpyxl
+numpy
+
+# ── PDF Processing (reused from v1) ────────────────────
+pypdf
+pymupdf
+pillow
+
+# ── Vector Search (reused from v1) ─────────────────────
+faiss-cpu
+sentence-transformers
+rank-bm25
+
+# ── PyTorch (required by sentence-transformers) ─────────
+torch
+torchvision
+
+# ── Charts ─────────────────────────────────────────────
+plotly
+
+# ── API ────────────────────────────────────────────────
+pydantic
+python-multipart
+
+# ── Utils ──────────────────────────────────────────────
+uuid
