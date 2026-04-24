@@ -1,4 +1,4 @@
-# RAG — PDF & Business Data Intelligence
+# 🔮 RAG — PDF & Business Data Intelligence
 
 ---
 
