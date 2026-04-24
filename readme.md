@@ -1,4 +1,4 @@
-# AI Business Report Analyzer — v2
+# RAG — PDF & Business Data Intelligence
 
 ---
 
