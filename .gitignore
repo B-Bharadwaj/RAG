@@ -1,116 +1,86 @@
-# =============================================================================
-# AI Business Report Analyzer v2 — .gitignore
-# =============================================================================
-
-
-# ── Secrets ───────────────────────────────────────────────────────────────────
-.env
-.env.local
-.env.example
-*.pem
-*.key
-
-
-# ── Storage — never commit these ──────────────────────────────────────────────
-storage/
-# Specifically:
-#   storage/index.faiss      — FAISS vector index (large binary)
-#   storage/metadata.pkl     — chunk metadata (large binary)
-#   storage/bm25.pkl         — BM25 index (large binary)
-#   storage/registry.db      — SQLite database (user data)
-#   storage/images/          — extracted PDF figure PNGs
-#   storage/uploads/         — uploaded business files (confidential)
-#   storage/charts/          — generated Plotly HTML charts
-#   storage/reports/         — generated markdown reports
-
-
-# ── Python ────────────────────────────────────────────────────────────────────
+# =========================
+# Python
+# =========================
 __pycache__/
 *.py[cod]
-*$py.class
-*.pyc
 *.pyo
 *.pyd
-.Python
+*.so
 
-
-# ── Virtual Environment ───────────────────────────────────────────────────────
+# Virtual environments
 venv/
 env/
-.venv/
 ENV/
 
+# Python env files
+.env
+*.env
 
-# ── ML Model Cache ────────────────────────────────────────────────────────────
-# HuggingFace models cached locally
-.cache/
-~/.cache/huggingface/
-*.bin
-*.safetensors
-*.onnx
-
-
-# ── Jupyter ───────────────────────────────────────────────────────────────────
+# Jupyter
 .ipynb_checkpoints/
-*.ipynb
 
-
-# ── VS Code ───────────────────────────────────────────────────────────────────
-.vscode/
-*.code-workspace
-
-
-# ── PyCharm ───────────────────────────────────────────────────────────────────
-.idea/
-*.iml
-
-
-# ── OS Files ──────────────────────────────────────────────────────────────────
-.DS_Store
-.DS_Store?
-._*
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-
-# ── Logs ─────────────────────────────────────────────────────────────────────
+# Logs
 *.log
-logs/
 
-
-# ── Test artifacts ────────────────────────────────────────────────────────────
-eval/test_set.json
-.pytest_cache/
-htmlcov/
-.coverage
-coverage.xml
-
-
-# ── Build artifacts ───────────────────────────────────────────────────────────
-dist/
-build/
-*.egg-info/
-*.egg
-.eggs/
-
-
-# ── Temporary files ───────────────────────────────────────────────────────────
-*.tmp
-*.temp
-tmp/
-temp/
-
-
-# ── Large files ───────────────────────────────────────────────────────────────
-*.pkl
-*.faiss
+# SQLite
 *.db
+*.sqlite3
 
+# =========================
+# FastAPI / Backend
+# =========================
+storage/
+uploads/
+temp/
+cache/
 
-# ── Uploaded data files ───────────────────────────────────────────────────────
-# Don't commit test datasets
-*.csv
-*.xlsx
-*.xls
-*.pdf
+# FAISS / embeddings
+*.faiss
+*.pkl
+*.npy
+
+# Models
+models/
+
+# =========================
+# Node / React
+# =========================
+frontend/node_modules/
+node_modules/
+
+# Build folders
+build/
+dist/
+
+# React env
+frontend/.env
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Charts / generated files
+# =========================
+storage/charts/
+storage/images/
+storage/reports/
+
+# =========================
+# Evaluation outputs
+# =========================
+eval/test_set.json
+
+# =========================
+# PyTorch / TensorFlow
+# =========================
+*.pt
+*.pth
+*.ckpt
