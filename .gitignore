@@ -39,8 +39,7 @@ cache/
 *.pkl
 *.npy
 
-# Models
-models/
+
 
 # =========================
 # Node / React
