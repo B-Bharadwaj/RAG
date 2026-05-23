@@ -45,27 +45,34 @@ export const pdfApi = {
 
   getDocument: (docId) => http.get(`/api/v1/documents/${docId}`),
 
+  // Generates summary on first call, cached on subsequent
+  getDocumentSummary: (docId) =>
+    http.get(`/api/v1/documents/${docId}/summary`),
+
   deleteDocument: (docId) => http.delete(`/api/v1/documents/${docId}`),
 
+  // Clears LLM memory only — does NOT affect history or eval
   clearMemory: () => http.delete("/api/v1/memory"),
 
-  getHistory: () => http.get("/api/v1/history"),
+  getHistory: (limit = 50) =>
+    http.get("/api/v1/history", { params: { limit } }),
 
-  // body: { n } — backend pulls n most recent un-scored queries from DB
+  clearHistory: () => http.delete("/api/v1/history"),
+
+  // body: { n } — scores n most recent un-scored queries
   scoreQuery: (n = 10) =>
     http.post("/api/v1/eval/score", { n }),
 
+  // returns { summary: { total, avg_faithfulness, avg_relevancy, avg_context_recall }, scores[] }
   getEvalResults: () => http.get("/api/v1/eval/results"),
 
   clearEvalResults: () => http.delete("/api/v1/eval/results"),
-
-  clearHistory: () => http.delete("/api/v1/history"),
 };
 
 // ─── Data / BI  (v2) ────────────────────────────────────────────────────────
 
 export const dataApi = {
-  // POST /upload — multipart, returns UploadResponse
+  // POST /upload → { file_id, file_name, file_type, sheet_names[], shape, insights, anomaly_count }
   uploadFile: (file, onProgress) => {
     const fd = new FormData();
     fd.append("file", file);
@@ -76,55 +83,65 @@ export const dataApi = {
     });
   },
 
-  // POST /question — body: { file_id, query, sheet_name? }
+  // POST /question → { answer, follow_ups, sql, chart? }
   askQuestion: (fileId, question, sheetName) =>
     http.post("/api/v2/question", {
-      file_id:    fileId,
-      query:      question,
+      file_id: fileId,
+      query: question,
       sheet_name: sheetName || undefined,
     }),
 
-  // GET /summary/{file_id} → SummaryResponse { file_id, summary }
+  // GET /columns/{file_id} → { columns: [{ name, type, unique_values[], unique_count, min, max }] }
+  getColumnValues: (fileId) =>
+    http.get(`/api/v2/columns/${fileId}`),
+
+  // GET /summary/{file_id} → { file_id, summary }
   getSummary: (fileId) => http.get(`/api/v2/summary/${fileId}`),
 
-  // GET /anomalies/{file_id} → AnomalyResponse { file_id, anomalies[], explanation }
+  // GET /anomalies/{file_id} → { file_id, anomalies[], explanation }
   getAnomalies: (fileId) => http.get(`/api/v2/anomalies/${fileId}`),
 
-  // POST /chart — body: { file_id, chart_type, x_col, y_col, title?, color_col?, sheet_name? }
-  generateChart: (fileId, chartType, xCol, yCol, title, colorCol, sheetName) =>
+  // POST /chart → Chart.js compatible data { chart_id, title, chart_type, labels, values, datasets[] }
+  generateChart: (fileId, chartType, xCol, yCol, title, aggregation, filterCol, filterValues, colorCol, sheetName) =>
     http.post("/api/v2/chart", {
-      file_id:    fileId,
+      file_id: fileId,
       chart_type: chartType,
-      x_col:      xCol,
-      y_col:      yCol || undefined,
-      title:      title || undefined,
-      color_col:  colorCol || undefined,
+      x_col: xCol,
+      y_col: yCol || undefined,
+      title: title || undefined,
+      aggregation: aggregation || "count",
+      filter_col: filterCol || undefined,
+      filter_values: filterValues || [],
+      color_col: colorCol || undefined,
       sheet_name: sheetName || undefined,
     }),
 
-  // GET /report/{file_id} → ReportResponse { report_id, file_id, file_path, timestamp }
+  // GET /report/{file_id} → { report_id, file_id, file_path, timestamp }
   getReport: (fileId) => http.get(`/api/v2/report/${fileId}`),
 
-  // GET /download/report/{report_id} → file download
+  // GET /download/report/{report_id} → markdown blob
   downloadReport: (reportId) =>
     http.get(`/api/v2/download/report/${reportId}`, { responseType: "blob" }),
 
-  // GET /files → FileInfoResponse[]
   listFiles: () => http.get("/api/v2/files"),
 
-  // GET /files/{file_id} → FileInfoResponse
   getFile: (fileId) => http.get(`/api/v2/files/${fileId}`),
 
-  // DELETE /files/{file_id}
   deleteFile: (fileId) => http.delete(`/api/v2/files/${fileId}`),
 
-
-  // ─── Query Log (/api/v2/query-log) ──────────────────────────────────────────
-  getQueryLog: () => http.get('/api/v2/query-log'),
-  getQueryLogByFile: (fileId) => http.get(`/api/v2/query-log/${fileId}`),
-  getQueryLogSummary: () => http.get('/api/v2/query-log-summary'),
-  clearQueryLog: () => http.delete('/api/v2/query-log'),
-  // GET /history/{file_id}?limit=20 → { file_id, history[] }
   getHistory: (fileId, limit = 20) =>
     http.get(`/api/v2/history/${fileId}`, { params: { limit } }),
+
+  // Query log endpoints
+  getQueryLog: (limit = 100) =>
+    http.get("/api/v2/query-log", { params: { limit } }),
+
+  getQueryLogByFile: (fileId, limit = 100) =>
+    http.get(`/api/v2/query-log/${fileId}`, { params: { limit } }),
+
+  getQueryLogSummary: () =>
+    http.get("/api/v2/query-log-summary"),
+
+  clearQueryLog: () =>
+    http.delete("/api/v2/query-log"),
 };

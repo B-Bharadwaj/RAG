@@ -12,7 +12,7 @@ export default function PdfManage() {
     try {
       const res = await pdfApi.listDocuments();
       const all = res.data?.documents || res.data || [];
-      setDocs(all.filter((d) => (d.file_type || d.type || "pdf").toLowerCase() === "pdf"));
+      setDocs(all.filter((d) => (d.file_type || "pdf").toLowerCase() === "pdf" || !d.file_type));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -22,8 +22,8 @@ export default function PdfManage() {
 
   useEffect(() => { load(); }, []);
 
+  // No window.confirm
   const deleteDoc = async (id) => {
-    if (!window.confirm("Delete this document from the index?")) return;
     setDeleting(id);
     try {
       await pdfApi.deleteDocument(id);
@@ -44,9 +44,7 @@ export default function PdfManage() {
             <p>{docs.length} document{docs.length !== 1 ? "s" : ""} indexed</p>
           </div>
           <div className="page-header-actions">
-            <button className="btn btn-secondary btn-sm" onClick={load}>
-              Refresh
-            </button>
+            <button className="btn btn-secondary btn-sm" onClick={load}>Refresh</button>
           </div>
         </div>
 
@@ -68,7 +66,8 @@ export default function PdfManage() {
               <thead>
                 <tr>
                   <th>Filename</th>
-                  <th>Document ID</th>
+                  <th>Title</th>
+                  <th>Pages</th>
                   <th>Chunks</th>
                   <th>Uploaded</th>
                   <th>Status</th>
@@ -81,18 +80,19 @@ export default function PdfManage() {
                   return (
                     <tr key={id}>
                       <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>
-                        {d.filename || d.title || "—"}
+                        {d.filename || "—"}
+                        <div className="text-mono text-sm text-muted">{id}</div>
                       </td>
-                      <td className="text-mono text-sm">{id}</td>
-                      <td className="text-mono">{d.chunks ?? d.chunk_count ?? "—"}</td>
+                      <td style={{ maxWidth: 200 }}>
+                        <div className="truncate text-sm">{d.title || d.filename || "—"}</div>
+                        <div className="text-sm text-muted">{d.authors || ""}</div>
+                      </td>
+                      <td className="text-mono">{d.page_count ?? "—"}</td>
+                      <td className="text-mono">{d.chunk_count ?? "—"}</td>
                       <td className="text-sm">
-                        {d.created_at
-                          ? new Date(d.created_at).toLocaleDateString()
-                          : "—"}
+                        {d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : "—"}
                       </td>
-                      <td>
-                        <span className="badge badge-success">Indexed</span>
-                      </td>
+                      <td><span className="badge badge-success">Indexed</span></td>
                       <td style={{ textAlign: "right" }}>
                         <button
                           className="btn btn-danger btn-sm"

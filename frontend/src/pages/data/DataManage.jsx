@@ -13,7 +13,7 @@ export default function DataManage({ onFileSelect }) {
     try {
       const res = await dataApi.listFiles();
       const all = res.data || [];
-      setFiles(all.filter((f) => ["csv","xlsx","xls"].includes((f.file_type || "").toLowerCase())));
+      setFiles(all.filter((f) => ["csv", "xlsx", "xls"].includes((f.file_type || "").toLowerCase())));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -23,8 +23,8 @@ export default function DataManage({ onFileSelect }) {
 
   useEffect(() => { load(); }, []);
 
+  // No window.confirm
   const deleteFile = async (id) => {
-    if (!window.confirm("Delete this file and all its history?")) return;
     setDeleting(id);
     try {
       await dataApi.deleteFile(id);
@@ -41,10 +41,6 @@ export default function DataManage({ onFileSelect }) {
     setSelectedId(id);
     if (onFileSelect) onFileSelect(id);
   };
-
-  // Backend FileInfoResponse fields:
-  // file_id, file_name, file_type, sheet_names,
-  // row_count, col_count, uploaded_at, summary
 
   return (
     <div className="page-content">
@@ -68,29 +64,20 @@ export default function DataManage({ onFileSelect }) {
           </div>
           <div className="kpi-card">
             <div className="kpi-label">Total Rows</div>
-            <div className="kpi-value">
-              {files.reduce((acc, f) => acc + (f.row_count || 0), 0).toLocaleString()}
-            </div>
+            <div className="kpi-value">{files.reduce((a, f) => a + (f.row_count || 0), 0).toLocaleString()}</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-label">CSV Files</div>
-            <div className="kpi-value">
-              {files.filter((f) => f.file_type === "csv").length}
-            </div>
+            <div className="kpi-value">{files.filter((f) => f.file_type === "csv").length}</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-label">Excel Files</div>
-            <div className="kpi-value">
-              {files.filter((f) => f.file_type === "xlsx" || f.file_type === "xls").length}
-            </div>
+            <div className="kpi-value">{files.filter((f) => f.file_type === "xlsx" || f.file_type === "xls").length}</div>
           </div>
         </div>
 
         {loading ? (
-          <div className="empty-state">
-            <div className="spinner" style={{ margin: "0 auto 12px" }} />
-            Loading files…
-          </div>
+          <div className="empty-state"><div className="spinner" style={{ margin: "0 auto 12px" }} />Loading files…</div>
         ) : files.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-title">No files uploaded yet</div>
@@ -105,7 +92,6 @@ export default function DataManage({ onFileSelect }) {
                   <th>Type</th>
                   <th>Rows</th>
                   <th>Columns</th>
-                  <th>Sheets</th>
                   <th>Uploaded</th>
                   <th>Status</th>
                   <th></th>
@@ -116,61 +102,21 @@ export default function DataManage({ onFileSelect }) {
                   const id = f.file_id;
                   const isActive = selectedId === id;
                   const typeColor = f.file_type === "csv" ? "badge-info" : "badge-success";
-
                   return (
-                    <tr
-                      key={id}
-                      style={{
-                        cursor: "pointer",
-                        background: isActive ? "var(--accent-glow)" : undefined,
-                      }}
-                      onClick={() => setActive(id)}
-                    >
+                    <tr key={id} style={{ cursor: "pointer", background: isActive ? "var(--accent-glow)" : undefined }} onClick={() => setActive(id)}>
                       <td>
-                        <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                          {f.file_name}
-                        </div>
+                        <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{f.file_name}</div>
                         <div className="text-mono text-sm text-muted">{id}</div>
                       </td>
-                      <td>
-                        <span className={`badge ${typeColor}`}>
-                          {(f.file_type || "—").toUpperCase()}
-                        </span>
-                      </td>
+                      <td><span className={`badge ${typeColor}`}>{(f.file_type || "—").toUpperCase()}</span></td>
                       <td className="text-mono">{f.row_count?.toLocaleString() ?? "—"}</td>
                       <td className="text-mono">{f.col_count ?? "—"}</td>
-                      <td className="text-sm">
-                        {f.sheet_names?.length > 0
-                          ? f.sheet_names.join(", ")
-                          : "—"}
-                      </td>
-                      <td className="text-sm">
-                        {f.uploaded_at
-                          ? new Date(f.uploaded_at).toLocaleDateString(undefined, {
-                              day: "numeric", month: "short", year: "numeric"
-                            })
-                          : "—"}
-                      </td>
-                      <td>
-                        {isActive ? (
-                          <span className="badge badge-success">Active</span>
-                        ) : (
-                          <span className="badge badge-neutral">Ready</span>
-                        )}
-                      </td>
+                      <td className="text-sm">{f.uploaded_at ? new Date(f.uploaded_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                      <td>{isActive ? <span className="badge badge-success">Active</span> : <span className="badge badge-neutral">Ready</span>}</td>
                       <td style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setActive(id)}
-                          >
-                            {isActive ? "Selected" : "Select"}
-                          </button>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => deleteFile(id)}
-                            disabled={deleting === id}
-                          >
+                          <button className="btn btn-secondary btn-sm" onClick={() => setActive(id)}>{isActive ? "Selected" : "Select"}</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => deleteFile(id)} disabled={deleting === id}>
                             {deleting === id ? <span className="spinner" /> : "Delete"}
                           </button>
                         </div>
@@ -184,9 +130,7 @@ export default function DataManage({ onFileSelect }) {
         )}
 
         {selectedId && (
-          <div className="success-banner mt-16">
-            File set as active — it will be used automatically in Chat, Visualize, and Report.
-          </div>
+          <div className="success-banner mt-16">File set as active — available in Chat, Visualize, and Report.</div>
         )}
       </div>
     </div>
