@@ -3,11 +3,11 @@ pipeline/retriever.py
 
 Hybrid retrieval: FAISS dense + BM25 sparse, with proper per-doc scoping.
 
-Search logic. hybrid_search() runs FAISS + BM25 in parallel and merges results. 
+Search logic. hybrid_search() runs FAISS + BM25 in parallel and merges results.
 In scoped mode it uses the per-doc BM25 so IDF weights are computed on that PDF's own vocabulary.
-per_pdf_search() guarantees representation from every indexed PDF 
-by running a scoped search per doc_id before pooling. 
-rerank() scores all candidates with a CrossEncoder. 
+per_pdf_search() guarantees representation from every indexed PDF
+by running a scoped search per doc_id before pooling.
+rerank() scores all candidates with a CrossEncoder.
 expand_query() generates query variations via Groq.
 """
 
@@ -63,7 +63,7 @@ def hybrid_search(query: str, top_k: int = TOP_K, doc_id: str | None = None) -> 
 
     fetch_k = top_k * 5 if doc_id else top_k
 
-    # ── Dense (FAISS) ────────────────────────────────────────────────────
+    # -- Dense (FAISS) ----------------------------------------------------
     query_embedding = np.array(embed_model.encode([query]), dtype=np.float32)
     D, I = index.search(query_embedding, min(fetch_k, len(documents)))
     vector_results = [documents[i] for i in I[0] if i < len(documents)]
@@ -74,7 +74,7 @@ def hybrid_search(query: str, top_k: int = TOP_K, doc_id: str | None = None) -> 
             if d.get("metadata", {}).get("doc_id") == doc_id
         ]
 
-    # ── Sparse (BM25) ────────────────────────────────────────────────────
+    # -- Sparse (BM25) ----------------------------------------------------
     if doc_id:
         per_doc = get_per_doc_bm25()
         doc_bm25 = per_doc.get(doc_id)
@@ -116,7 +116,7 @@ def hybrid_search(query: str, top_k: int = TOP_K, doc_id: str | None = None) -> 
                 documents[i] for i in bm25_indices if i < len(documents)
             ]
 
-    # ── Merge & deduplicate ──────────────────────────────────────────────
+    # -- Merge & deduplicate ----------------------------------------------
     combined = vector_results + keyword_results
     unique = {doc["text"]: doc for doc in combined}
     return list(unique.values())[: top_k * 2]

@@ -1,7 +1,7 @@
 """
 services/query_logger.py
 
-Query log functions — now backed by PostgreSQL.
+Query log functions - now backed by PostgreSQL.
 All data stored in the query_log table in PostgreSQL.
 
 This file is kept as a clean interface so the rest of

@@ -5,10 +5,10 @@ Extended from v1 to support Excel and CSV in addition to PDF.
 
 v1: load_pdf(), extract_images()
 v2 additions:
-    - load_excel()  — handles single and multi-sheet workbooks
-    - load_csv()    — loads CSV into a DataFrame
-    - load_file()   — master router, detects file type automatically
-    - FileData      — unified container for any file type
+    - load_excel()  - handles single and multi-sheet workbooks
+    - load_csv()    - loads CSV into a DataFrame
+    - load_file()   - master router, detects file type automatically
+    - FileData      - unified container for any file type
 """
 
 import os
@@ -20,7 +20,7 @@ from PIL import Image
 from dataclasses import dataclass, field
 
 
-# ── Unified data container ─────────────────────────────────────────────────
+# -- Unified data container -------------------------------------------------
 
 @dataclass
 class FileData:
@@ -45,7 +45,7 @@ class FileData:
     sheet_names: list[str] = field(default_factory=list)
 
 
-# ── Master router ──────────────────────────────────────────────────────────
+# -- Master router ----------------------------------------------------------
 
 def load_file(file_path: str, file_name: str) -> FileData:
     """
@@ -75,7 +75,7 @@ def load_file(file_path: str, file_name: str) -> FileData:
         )
 
 
-# ── PDF Loader (from v1 — unchanged) ──────────────────────────────────────
+# -- PDF Loader (from v1 - unchanged) --------------------------------------
 
 def load_pdf(file_path: str) -> list[tuple[int, str]]:
     """
@@ -84,7 +84,7 @@ def load_pdf(file_path: str) -> list[tuple[int, str]]:
 
     Returns
     -------
-    list of (page_num: int, page_text: str) — 1-indexed
+    list of (page_num: int, page_text: str) - 1-indexed
     """
     reader = PdfReader(file_path)
     pages_text = []
@@ -102,7 +102,7 @@ def extract_images(pdf_path: str) -> list[tuple[int, Image.Image]]:
 
     Returns
     -------
-    list of (page_num: int, PIL.Image) — 1-indexed
+    list of (page_num: int, PIL.Image) - 1-indexed
     """
     pdf = fitz.open(pdf_path)
     images = []
@@ -126,11 +126,11 @@ def _load_pdf(file_path: str, file_name: str) -> FileData:
     )
 
 
-# ── Excel Loader (NEW) ─────────────────────────────────────────────────────
+# -- Excel Loader (NEW) -----------------------------------------------------
 
 def _load_excel(file_path: str, file_name: str) -> FileData:
     """
-    Load an Excel file — handles single and multi-sheet workbooks.
+    Load an Excel file - handles single and multi-sheet workbooks.
     Each sheet becomes a separate DataFrame in FileData.dataframes.
     """
     excel_file  = pd.ExcelFile(file_path)
@@ -165,7 +165,7 @@ def _load_excel(file_path: str, file_name: str) -> FileData:
     )
 
 
-# ── CSV Loader (NEW) ───────────────────────────────────────────────────────
+# -- CSV Loader (NEW) -------------------------------------------------------
 
 def _load_csv(file_path: str, file_name: str) -> FileData:
     """
@@ -198,7 +198,7 @@ def _load_csv(file_path: str, file_name: str) -> FileData:
     )
 
 
-# ── Quick test ─────────────────────────────────────────────────────────────
+# -- Quick test -------------------------------------------------------------
 
 if __name__ == "__main__":
     import sys

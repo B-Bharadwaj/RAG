@@ -29,8 +29,8 @@ You are creating evaluation questions for a RAG system over research papers.
 Given these text chunks from a research paper, generate {n} question-answer pairs.
 
 Rules:
-- Questions must be answerable ONLY from the given chunks — no outside knowledge
-- Ground truth answers must be specific and concise (1–3 sentences)
+- Questions must be answerable ONLY from the given chunks - no outside knowledge
+- Ground truth answers must be specific and concise (1-3 sentences)
 - Vary question types: factual, methodological, result-based
 - Do NOT ask vague questions like "What is this paper about?"
 
@@ -72,13 +72,13 @@ def _generate_pairs_from_chunks(chunks: list[dict], n: int = 2) -> list[dict]:
                 p["doc_id"] = chunks[0].get("metadata", {}).get("doc_id", "")
             return pairs
         except json.JSONDecodeError:
-            print(f"  JSON parse failed attempt {attempt+1}, retrying…")
+            print(f"  JSON parse failed attempt {attempt+1}, retrying ")
             time.sleep(5)
         except Exception as e:
             err = str(e).lower()
             if "rate limit" in err or "429" in err:
                 wait = 20 * (attempt + 1)
-                print(f"  Rate limited, waiting {wait}s…")
+                print(f"  Rate limited, waiting {wait}s ")
                 time.sleep(wait)
             else:
                 print(f"  Error: {e}")
@@ -95,11 +95,11 @@ def generate_test_set(target: int = TARGET_PAIRS) -> list[dict]:
     from pipeline.indexer import get_documents
 
     all_docs = get_documents()
-    # Only use text chunks — image captions make poor eval questions
+    # Only use text chunks - image captions make poor eval questions
     text_docs = [d for d in all_docs if d.get("type") == "text"]
 
     if not text_docs:
-        print("[test_generator] No text chunks found — upload PDFs first.")
+        print("[test_generator] No text chunks found - upload PDFs first.")
         return []
 
     print(f"[test_generator] {len(text_docs)} text chunks available across your PDFs.")
@@ -116,7 +116,7 @@ def generate_test_set(target: int = TARGET_PAIRS) -> list[dict]:
         idx += CHUNKS_PER_CALL
         n_to_gen = min(2, target - len(all_pairs))
 
-        print(f"  Generating {n_to_gen} pairs from chunks {idx-CHUNKS_PER_CALL}–{idx}…")
+        print(f"  Generating {n_to_gen} pairs from chunks {idx-CHUNKS_PER_CALL}-{idx} ")
         pairs = _generate_pairs_from_chunks(batch, n=n_to_gen)
         all_pairs.extend(pairs)
         calls += 1
@@ -131,7 +131,7 @@ def generate_test_set(target: int = TARGET_PAIRS) -> list[dict]:
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         json.dump(all_pairs, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[test_generator] Saved {len(all_pairs)} pairs → {OUTPUT_PATH}")
+    print(f"\n[test_generator] Saved {len(all_pairs)} pairs -> {OUTPUT_PATH}")
     return all_pairs
 
 
@@ -139,4 +139,4 @@ if __name__ == "__main__":
     # Need the app state loaded before we can read chunks
     from pipeline.indexer import load_state
     load_state()
-
+    generate_test_set()

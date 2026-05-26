@@ -18,7 +18,7 @@ from services.query_logger import (
 router = APIRouter()
 
 
-# ── Get all query logs ─────────────────────────────────────────────────────
+# -- Get all query logs -----------------------------------------------------
 
 @router.get("/query-log")
 async def list_query_logs(limit: int = 100):
@@ -33,7 +33,7 @@ async def list_query_logs(limit: int = 100):
     }
 
 
-# ── Get logs for a specific file ───────────────────────────────────────────
+# -- Get logs for a specific file -------------------------------------------
 
 @router.get("/query-log/{file_id}")
 async def get_file_query_logs(file_id: str, limit: int = 100):
@@ -49,7 +49,7 @@ async def get_file_query_logs(file_id: str, limit: int = 100):
     }
 
 
-# ── Summary stats ──────────────────────────────────────────────────────────
+# -- Summary stats ----------------------------------------------------------
 
 @router.get("/query-log-summary")
 async def query_log_summary():
@@ -57,15 +57,15 @@ async def query_log_summary():
     Get summary statistics across all logged queries.
 
     Returns:
-        total   → total queries logged
-        success → queries that ran successfully
-        errors  → queries that threw an error
-        not_sql → questions LLM couldn't answer with SQL
+        total   -> total queries logged
+        success -> queries that ran successfully
+        errors  -> queries that threw an error
+        not_sql -> questions LLM couldn't answer with SQL
     """
     return get_query_log_summary()
 
 
-# ── Clear logs ─────────────────────────────────────────────────────────────
+# -- Clear logs -------------------------------------------------------------
 
 @router.delete("/query-log")
 async def clear_all_query_logs():
@@ -83,4 +83,3 @@ async def clear_file_query_logs(file_id: str):
         "file_id": file_id,
         "message": f"Query logs cleared for file {file_id}.",
     }
-

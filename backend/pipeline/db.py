@@ -1,13 +1,13 @@
 """
 pipeline/db.py
 
-SQLite-backed registry — PDF Mode only.
+SQLite-backed registry - PDF Mode only.
 
 Tables:
-    documents         — indexed PDF registry
-    question_history  — PDF chat history
-    feedback          — thumbs up/down ratings
-    eval_scores       — judge LLM evaluation scores
+    documents         - indexed PDF registry
+    question_history  - PDF chat history
+    feedback          - thumbs up/down ratings
+    eval_scores       - judge LLM evaluation scores
 
 NOTE: All Data Mode tables (business_files, analysis_history,
 query_log) have moved to PostgreSQL in services/sql_engine.py
@@ -28,7 +28,7 @@ def _connect():
 
 def init_db():
     with _connect() as conn:
-        # ── Documents table ────────────────────────────────────────────────
+        # -- Documents table ------------------------------------------------
         conn.execute("""
             CREATE TABLE IF NOT EXISTS documents (
                 doc_id        TEXT PRIMARY KEY,
@@ -40,7 +40,7 @@ def init_db():
                 pdf_summary   TEXT DEFAULT ''
             )
         """)
-        # Migrations — safe on existing DBs
+        # Migrations - safe on existing DBs
         for col, default in [
             ("pdf_metadata", "'{}'"),
             ("pdf_summary",  "''"),
@@ -52,7 +52,7 @@ def init_db():
             except sqlite3.OperationalError:
                 pass
 
-        # ── Question history table ─────────────────────────────────────────
+        # -- Question history table -----------------------------------------
         conn.execute("""
             CREATE TABLE IF NOT EXISTS question_history (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,7 +63,7 @@ def init_db():
             )
         """)
 
-        # ── Feedback table ─────────────────────────────────────────────────
+        # -- Feedback table -------------------------------------------------
         conn.execute("""
             CREATE TABLE IF NOT EXISTS feedback (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,

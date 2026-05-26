@@ -6,7 +6,7 @@ Each page is processed by PyMuPDF which detects figure bounding boxes.
 Each detected figure is cropped, saved as a PNG, and sent to Groq Vision
 individually. This means the UI shows just the figure, not the whole page.
 
-storage/images/<doc_id>_p<page>_fig<n>.png  — one file per detected figure
+storage/images/<doc_id>_p<page>_fig<n>.png  - one file per detected figure
 """
 
 import base64
@@ -215,7 +215,7 @@ def caption_images(
     Run Groq Vision over a list of (page_num, PIL.Image) tuples in parallel.
 
     If pdf_path is provided, uses PyMuPDF to extract cropped figures per page
-    so only the figure itself is saved and shown — not the whole page.
+    so only the figure itself is saved and shown - not the whole page.
 
     Parameters
     ----------
@@ -223,7 +223,7 @@ def caption_images(
     pdf_name          : original filename
     doc_id            : UUID for scoped deletion
     progress_callback : optional callable(completed: int, total: int)
-    pdf_path          : path to the original PDF — enables figure cropping
+    pdf_path          : path to the original PDF - enables figure cropping
 
     Returns
     -------

@@ -1,3 +1,4 @@
+
 """
 generation/generator.py
 
@@ -45,7 +46,7 @@ _OVERVIEW_KEYWORDS = {
     "method", "approach", "technique", "architecture", "model used",
 }
 
-# ── Image query detection ─────────────────────────────────────────────────────
+# -- Image query detection -----------------------------------------------------
 # When the query mentions any of these, image chunks are force-included
 # in the retrieval pool so the figure panel fires in the UI.
 _IMAGE_KEYWORDS = {
@@ -102,6 +103,9 @@ def extract_pdf_metadata(first_page_text: str, filename: str) -> dict:
             temperature=0.0,
         )
         raw = response.choices[0].message.content.strip()
+        print("========== RAW META RESPONSE ==========")
+        print(raw)
+        print("=======================================")
         if raw.startswith("```"):
             parts = raw.split("```")
             raw = parts[1] if len(parts) > 1 else raw
@@ -147,7 +151,8 @@ def generate_paper_summary(doc_id: str, pdf_name: str) -> str:
     paper_chunks = [
         d for d in all_docs
         if d.get("metadata", {}).get("doc_id") == doc_id
-        and d.get("type") == "text"
+        #and d.get("type") == "text"
+        and d.get("text")
     ]
     paper_chunks.sort(key=lambda d: d.get("metadata", {}).get("page", 99))
     selected = paper_chunks[:4]
@@ -182,18 +187,39 @@ def generate_paper_summary(doc_id: str, pdf_name: str) -> str:
             summary = response.choices[0].message.content.strip()
             log.info("Summary generated for '%s'", pdf_name)
             return summary
+        # except Exception as e:
+        #     err = str(e).lower()
+        #     if "rate limit" in err or "429" in err or "413" in err:
+        #         wait = 10 if attempt == 0 else 20
+        #         log.warning("Summary rate-limited for '%s', waiting %ds...", pdf_name, wait)
+        #         _time.sleep(wait)
+        #     else:
+        #         log.warning("Summary failed for '%s': %s", pdf_name, e)
+        #         return ""
         except Exception as e:
             err = str(e).lower()
+
+            print("========== SUMMARY ERROR ==========")
+            print("PDF:", pdf_name)
+            print("ERROR:", e)
+            print("MODEL:", GROQ_MODEL_NAME)
+            print("CONTEXT LENGTH:", len(context))
+            print("===================================")
+
             if "rate limit" in err or "429" in err or "413" in err:
                 wait = 10 if attempt == 0 else 20
-                log.warning("Summary rate-limited for '%s', waiting %ds...", pdf_name, wait)
+                log.warning(
+                    "Summary rate-limited for '%s', waiting %ds...",
+                    pdf_name,
+                    wait
+                )
                 _time.sleep(wait)
             else:
                 log.warning("Summary failed for '%s': %s", pdf_name, e)
                 return ""
 
-    log.warning("Summary gave up after retries for '%s'", pdf_name)
-    return ""
+            log.warning("Summary gave up after retries for '%s'", pdf_name)
+            return ""
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +246,7 @@ def generate_followup_suggestions(query: str, answer: str, pdf_names: list[str])
                 temperature=0.7,
             )
             lines = response.choices[0].message.content.strip().split("\n")
-            suggestions = [l.strip().lstrip("•-123456789. ") for l in lines if len(l.strip()) > 10]
+            suggestions = [l.strip().lstrip("*-123456789. ") for l in lines if len(l.strip()) > 10]
             return suggestions[:3]
         except Exception as e:
             err = str(e).lower()
@@ -245,7 +271,7 @@ def _get_unique_pdfs_in_docs(docs: list[dict]) -> set[str]:
     names = set()
     for doc in docs:
         pdf = doc.get("metadata", {}).get("pdf", "unknown")
-        # Strip any path prefix — keep only filename
+        # Strip any path prefix - keep only filename
         pdf = pdf.split("/")[-1].split("\\")[-1]
         names.add(pdf)
     return names
@@ -307,7 +333,7 @@ def _build_context(docs: list[dict]) -> str:
             doc_type = doc.get("type", "text").upper()
             meta     = doc.get("metadata", {})
             page     = meta.get("page", "?")
-            parts.append(f"[{doc_type} — {pdf_name} — Page {page}]\n{doc['text']}")
+            parts.append(f"[{doc_type} - {pdf_name} - Page {page}]\n{doc['text']}")
 
     return "\n\n---\n\n".join(parts)
 
@@ -345,7 +371,7 @@ def _fetch_early_page_chunks(doc_id: str | None, pdf_names: list[str]) -> list[d
 
 
 # ---------------------------------------------------------------------------
-# Image chunk boosting — NEW
+# Image chunk boosting - NEW
 # ---------------------------------------------------------------------------
 
 def _fetch_image_chunks(doc_id: str | None) -> list[dict]:
@@ -471,25 +497,25 @@ RULES:
 5. If the context has no relevant info for a specific paper, say so briefly for that paper only.
 6. NEVER fabricate facts not present in the context.
 7. The context you are given is complete. Trust it.
-8. Do not over-generalize from a single chunk — synthesize across ALL context sections.
+8. Do not over-generalize from a single chunk - synthesize across ALL context sections.
 9. Answer ONLY about what the retrieved context says. Do NOT mix information from different
    papers unless the context explicitly contains both.
 10. For single-paper answers: end with CONFIDENCE: High / Medium / Low"""
 
 _MULTI_PDF_RULES = """\
 11. Context comes from MULTIPLE papers. You MUST cover EVERY paper listed above.
-    Use EXACTLY the filename as given in the papers list above — do not modify, shorten,
+    Use EXACTLY the filename as given in the papers list above - do not modify, shorten,
     or rename any filename under any circumstances.
-    Structure your answer with EXACTLY this format — one block per paper, no exceptions:
+    Structure your answer with EXACTLY this format - one block per paper, no exceptions:
 
     **[exact filename here]**
     [your answer for this paper in 2-3 sentences]
     CONFIDENCE: High / Medium / Low
 
     Rules:
-    - Each paper gets exactly ONE block — never split a paper across multiple blocks
+    - Each paper gets exactly ONE block - never split a paper across multiple blocks
     - Never repeat the same filename twice
-    - Never modify a filename — copy it exactly as shown in the papers list
+    - Never modify a filename - copy it exactly as shown in the papers list
     - Always end each block with CONFIDENCE on its own line
     - Leave one blank line between each paper block
     - After all paper blocks add a brief Overall Comparison if relevant
@@ -550,7 +576,7 @@ def generate_answer(
 
     if is_multi_pdf and pdf_names:
         papers_line = (
-            f"PAPERS — use EXACTLY these filenames, copy them character by character:\n"
+            f"PAPERS - use EXACTLY these filenames, copy them character by character:\n"
             + "\n".join(f"  - {name}" for name in pdf_names)
             + "\n\n"
         )
@@ -756,7 +782,7 @@ def ask_comparison(query: str, doc_ids: list[str]) -> tuple[str, list[dict]]:
         "2. Structure your answer STRICTLY as:\n"
         "   - One block per paper: '**filename.pdf**: [findings]'\n"
         "   - A final '**Comparison**: [key similarities and differences]' block\n"
-        "3. Be specific — cite actual numbers, methods, and results where available.\n"
+        "3. Be specific - cite actual numbers, methods, and results where available.\n"
         "4. If a paper has no relevant context for this question, say so in its block.\n"
         "5. NEVER fabricate information not in the context.\n\n"
         f"CONTEXT:\n{context}\n\n"
@@ -774,9 +800,9 @@ def ask_comparison(query: str, doc_ids: list[str]) -> tuple[str, list[dict]]:
     except Exception as e:
         log.error("Comparison failed: %s", e)
         return f"Comparison failed: {e}", []
-    
+   
 # ===========================================================================
-# v2 ADDITIONS — Business Intelligence generation functions
+# v2 ADDITIONS - Business Intelligence generation functions
 # ===========================================================================
 
 from prompts import (
@@ -815,7 +841,7 @@ def reset_business_memory(file_id: str = None):
     log.info("Business memory cleared.")
 
 
-# ── Model Router ───────────────────────────────────────────────────────────
+# -- Model Router -----------------------------------------------------------
 
 def _choose_model(task: str) -> str:
     """
@@ -827,7 +853,7 @@ def _choose_model(task: str) -> str:
     return GROQ_MODEL_LARGE if task in complex_tasks else GROQ_MODEL_SMALL
 
 
-# ── Business Q&A ───────────────────────────────────────────────────────────
+# -- Business Q&A -----------------------------------------------------------
 
 def ask_business_question(
     query: str,
@@ -887,10 +913,10 @@ def ask_business_question(
                 log.error("Business Q&A failed: %s", e)
                 return f"Error generating answer: {e}", []
 
-    return "Failed after retries — please try again.", []
+    return "Failed after retries - please try again.", []
 
 
-# ── Auto Insights ──────────────────────────────────────────────────────────
+# -- Auto Insights ----------------------------------------------------------
 
 def generate_business_insights(context: str, file_name: str) -> str:
     """
@@ -927,7 +953,7 @@ def generate_business_insights(context: str, file_name: str) -> str:
     return ""
 
 
-# ── Executive Summary ──────────────────────────────────────────────────────
+# -- Executive Summary ------------------------------------------------------
 
 def generate_executive_summary(context: str, file_name: str) -> str:
     """
@@ -970,7 +996,7 @@ def generate_executive_summary(context: str, file_name: str) -> str:
     return ""
 
 
-# ── Anomaly Explanation ────────────────────────────────────────────────────
+# -- Anomaly Explanation ----------------------------------------------------
 
 def explain_anomalies(context: str, anomalies: list[dict]) -> str:
     """
@@ -1019,7 +1045,7 @@ def explain_anomalies(context: str, anomalies: list[dict]) -> str:
     return ""
 
 
-# ── Follow-up Suggestions ──────────────────────────────────────────────────
+# -- Follow-up Suggestions --------------------------------------------------
 
 def _business_followup_suggestions(query: str, answer: str) -> list[str]:
     """Generate 3 follow-up questions after a business Q&A response."""
@@ -1045,13 +1071,12 @@ def _business_followup_suggestions(query: str, answer: str) -> list[str]:
         log.warning("Follow-up suggestions failed: %s", e)
         return []
     
-    
 def ask_business_question_with_chart(
     query: str,
     context: str,
     file_id: str,
     file_name: str,
-    df,                    # pandas DataFrame — for chart generation
+    df,                    # pandas DataFrame - for chart generation
 ) -> tuple[str, list[str], dict | None]:
     """
     Extended version of ask_business_question that also
@@ -1063,7 +1088,7 @@ def ask_business_question_with_chart(
     """
     from services.chart_generator import needs_chart, generate_chat_chart
 
-    # Step 1 — get text answer as normal
+    # Step 1 - get text answer as normal
     answer, suggestions = ask_business_question(
         query     = query,
         context   = context,
@@ -1071,7 +1096,7 @@ def ask_business_question_with_chart(
         file_name = file_name,
     )
 
-    # Step 2 — check if chart is needed
+    # Step 2 - check if chart is needed
     chart_result = None
     if needs_chart(query) and df is not None:
         try:
@@ -1090,7 +1115,7 @@ def ask_business_question_with_chart(
     return answer, suggestions, chart_result
 
 # =============================================================================
-# v3 ADDITIONS — Text-to-SQL generation
+# v3 ADDITIONS - Text-to-SQL generation
 # =============================================================================
 
 from prompts import SQL_GENERATION_PROMPT, SQL_ANSWER_PROMPT
@@ -1188,7 +1213,7 @@ def sql_result_to_answer(
     return f"Query returned {len(rows)} rows with columns: {columns}"
 
 # =============================================================================
-# v3 ADDITIONS — SQL-driven summary and anomaly generation
+# v3 ADDITIONS - SQL-driven summary and anomaly generation
 # =============================================================================
 
 from prompts import (
@@ -1371,11 +1396,11 @@ def generate_sql_chart_query(
     Passes detected specific values so LLM can use WHERE IN filtering.
 
     Returns dict with:
-        sql        → PostgreSQL query to run
-        chart_type → bar, line, pie, scatter, hist
-        x_col      → column for X axis
-        y_col      → column for Y axis
-        title      → chart title
+        sql        -> PostgreSQL query to run
+        chart_type -> bar, line, pie, scatter, hist
+        x_col      -> column for X axis
+        y_col      -> column for Y axis
+        title      -> chart title
     """
     import time as _time
     import json as _json
@@ -1387,7 +1412,7 @@ def generate_sql_chart_query(
             for col, vals in specific_values.items()
         )
     else:
-        sv_text = "  None detected — show top 10 by value"
+        sv_text = "  None detected - show top 10 by value"
 
     prompt = SQL_CHART_PROMPT.format(
         schema          = schema,
@@ -1416,7 +1441,7 @@ def generate_sql_chart_query(
             result = _json.loads(raw.strip())
 
             # Validate required fields
-            required = ["sql", "chart_type", "x_col", "y_col", "title"]
+            required = ["sql", "chart_type", "x_col", "y_col", "color_col", "title"]
             if all(k in result for k in required):
                 return result
 
@@ -1431,3 +1456,82 @@ def generate_sql_chart_query(
                 return {"sql": "NOT_SQL"}
 
     return {"sql": "NOT_SQL"}
+
+# =============================================================================
+# v3 ADDITIONS - Manual chart SQL generation (no LLM needed)
+# =============================================================================
+# PostgreSQL is case sensitive - find the correct column name
+# by matching case-insensitively against the schema
+
+def generate_manual_chart_sql(
+    table_name:    str,
+    x_col:         str,
+    y_col:         str | None,
+    aggregation:   str,
+    filter_col:    str | None,
+    filter_values: list[str],
+    chart_type:    str,
+) -> str:
+
+    def _match_col(col_input: str, tname: str) -> str:
+        try:
+            from services.sql_engine import get_connection
+            conn   = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = %s AND table_schema = 'public'
+            """, (tname,))
+            actual_cols = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            for actual in actual_cols:
+                if actual.lower() == col_input.lower():
+                    return actual
+        except Exception:
+            pass
+        return col_input
+
+    # Fix column name casing - these are at function level, NOT inside _match_col
+    x_col     = _match_col(x_col, table_name)
+    if y_col:
+        y_col = _match_col(y_col, table_name)
+    if filter_col:
+        filter_col = _match_col(filter_col, table_name)
+
+    agg_map = {
+        "count": 'COUNT(*) as "count"',
+        "sum":   f'SUM("{y_col}") as "total"'   if y_col else 'COUNT(*) as "count"',
+        "avg":   f'AVG("{y_col}") as "average"' if y_col else 'COUNT(*) as "count"',
+        "min":   f'MIN("{y_col}") as "minimum"' if y_col else 'COUNT(*) as "count"',
+        "max":   f'MAX("{y_col}") as "maximum"' if y_col else 'COUNT(*) as "count"',
+    }
+
+    agg_expr    = agg_map.get(aggregation, 'COUNT(*) as "count"')
+    agg_col     = agg_expr.split(" as ")[-1].strip('"')
+
+    select      = f'SELECT "{x_col}", {agg_expr}'
+    from_clause = f'FROM "{table_name}"'
+
+    where = ""
+    if filter_col and filter_values:
+        escaped = ", ".join(f"'{v}'" for v in filter_values)
+        where   = f'WHERE "{filter_col}" IN ({escaped})'
+
+    group_by = f'GROUP BY "{x_col}"'
+    order_by = f'ORDER BY "{agg_col}" DESC'
+    limit    = "LIMIT 15"
+
+    if chart_type == "hist":
+        col = y_col if y_col else x_col
+        return f'SELECT "{col}" FROM "{table_name}" {where} LIMIT 500'
+
+    if chart_type == "scatter" and y_col:
+        return (
+            f'SELECT "{x_col}", "{y_col}" '
+            f'FROM "{table_name}" '
+            f'{where} '
+            f'LIMIT 200'
+        )
+
+    sql = f"{select} {from_clause} {where} {group_by} {order_by} {limit}"
+    return sql.strip()

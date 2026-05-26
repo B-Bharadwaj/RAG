@@ -1,11 +1,11 @@
 """
 eval/run_eval.py
 
-Batch evaluation runner — loops through either:
+Batch evaluation runner - loops through either:
   (a) the saved test_set.json  (benchmark mode)
   (b) the last N un-scored chat queries from question_history  (live mode)
 
-Each row: calls ask_question() → passes result to judge → saves to SQLite.
+Each row: calls ask_question() -> passes result to judge -> saves to SQLite.
 
 Usage (standalone):
     python -m eval.run_eval --mode testset
@@ -38,7 +38,7 @@ def run_on_test_set(path: str = "eval/test_set.json", delay: float = 6.0):
     with open(path, encoding="utf-8") as f:
         test_set = json.load(f)
 
-    print(f"[run_eval] Scoring {len(test_set)} test-set questions…")
+    print(f"[run_eval] Scoring {len(test_set)} test-set questions ")
     results = []
 
     for i, item in enumerate(test_set):
@@ -46,7 +46,7 @@ def run_on_test_set(path: str = "eval/test_set.json", delay: float = 6.0):
         ground_truth = item.get("ground_truth", "")
         doc_id       = item.get("doc_id") or None
 
-        print(f"\n[{i+1}/{len(test_set)}] Q: {query[:80]}…")
+        print(f"\n[{i+1}/{len(test_set)}] Q: {query[:80]} ")
 
         try:
             answer, top_docs, _, _ = ask_question(query, doc_id=doc_id)
@@ -78,7 +78,7 @@ def run_on_test_set(path: str = "eval/test_set.json", delay: float = 6.0):
         # Delay keeps us inside Groq free-tier limits
         time.sleep(delay)
 
-    print(f"\n[run_eval] Done — {len(results)} rows saved to SQLite.")
+    print(f"\n[run_eval] Done - {len(results)} rows saved to SQLite.")
     return results
 
 
@@ -90,14 +90,14 @@ def run_on_recent_queries(n: int = 10, delay: float = 6.0):
         print("[run_eval] No un-scored queries found in question_history.")
         return []
 
-    print(f"[run_eval] Scoring {len(recent)} recent un-scored queries…")
+    print(f"[run_eval] Scoring {len(recent)} recent un-scored queries ")
     results = []
 
     for i, item in enumerate(recent):
         query = item["query"]
         scope = item.get("scope", "All PDFs")
 
-        print(f"\n[{i+1}/{len(recent)}] Q: {query[:80]}…")
+        print(f"\n[{i+1}/{len(recent)}] Q: {query[:80]} ")
 
         try:
             answer, top_docs, _, _ = ask_question(query)
@@ -126,7 +126,7 @@ def run_on_recent_queries(n: int = 10, delay: float = 6.0):
         results.append(scores)
         time.sleep(delay)
 
-    print(f"\n[run_eval] Done — {len(results)} rows saved to SQLite.")
+    print(f"\n[run_eval] Done - {len(results)} rows saved to SQLite.")
     return results
 
 
