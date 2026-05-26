@@ -574,10 +574,9 @@ async def delete_file(file_id: str):
     return {"status": "deleted", "file_id": file_id}
 
 
-# -- Analysis History -------------------------------------------------------
+# ──-- Analysis History ───────────────────────────────────────────────────────-------------------------------------------------------
 
 @router.get("/history/{file_id}")
-async def get_history(file_id: str, limit: int = 20):
-    """Get Q&A history for a specific file."""
-    history = get_analysis_history(file_id, limit=limit)
+async def get_history(file_id: str, limit: int = 10, offset: int = 0):
+    history = get_analysis_history(file_id, limit=limit, offset=offset)
     return {"file_id": file_id, "history": history}
