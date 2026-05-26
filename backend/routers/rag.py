@@ -2,20 +2,20 @@
 routers/rag.py
 
 FastAPI endpoints for the v1 PDF RAG pipeline.
-All v1 pipeline functions are called directly — nothing modified.
+All v1 pipeline functions are called directly - nothing modified.
 
 Endpoints:
-    POST   /upload              — upload + process a PDF
-    POST   /chat                — ask a question
-    POST   /compare             — compare 2-3 papers
-    GET    /documents           — list all indexed documents
-    GET    /documents/{doc_id}  — get document info + summary
-    DELETE /documents/{doc_id}  — delete a document
-    DELETE /memory              — clear conversation memory
-    POST   /eval/score          — score recent queries
-    GET    /eval/results        — get eval scores + summary
-    DELETE /eval/results        — clear eval scores
-    GET    /health              — health check
+    POST   /upload              - upload + process a PDF
+    POST   /chat                - ask a question
+    POST   /compare             - compare 2-3 papers
+    GET    /documents           - list all indexed documents
+    GET    /documents/{doc_id}  - get document info + summary
+    DELETE /documents/{doc_id}  - delete a document
+    DELETE /memory              - clear conversation memory
+    POST   /eval/score          - score recent queries
+    GET    /eval/results        - get eval scores + summary
+    DELETE /eval/results        - clear eval scores
+    GET    /health              - health check
 """
 
 import os
@@ -38,7 +38,7 @@ from pipeline.db      import (
 )
 from generation.generator import (
     ask_question, reset_memory,
-    extract_pdf_metadata, generate_paper_summary, ask_comparison,
+    extract_pdf_metadata, ask_comparison,
 )
 
 router = APIRouter()
@@ -47,7 +47,7 @@ MAX_FILE_SIZE_MB = 50
 MAX_PAGE_COUNT   = 100
 
 
-# ── Pydantic schemas ───────────────────────────────────────────────────────
+# -- Pydantic schemas -------------------------------------------------------
 
 class ChatRequest(BaseModel):
     query:  str
@@ -62,14 +62,14 @@ class CompareRequest(BaseModel):
 class EvalRequest(BaseModel):
     n: int = 10                    # number of recent queries to score
 
-
-# ── Helpers ────────────────────────────────────────────────────────────────
+   
+# -- Helpers ----------------------------------------------------------------
 
 def _validate_pdf(path: str, name: str) -> int:
     """Validate PDF size and page count. Returns page count."""
     size_mb = os.path.getsize(path) / (1024 * 1024)
     if size_mb > MAX_FILE_SIZE_MB:
-        raise ValueError(f"'{name}' is {size_mb:.1f} MB — exceeds {MAX_FILE_SIZE_MB} MB.")
+        raise ValueError(f"'{name}' is {size_mb:.1f} MB - exceeds {MAX_FILE_SIZE_MB} MB.")
     from pypdf import PdfReader
     from pypdf.errors import PdfReadError
     try:
@@ -79,15 +79,15 @@ def _validate_pdf(path: str, name: str) -> int:
     if n == 0:
         raise ValueError(f"'{name}' has no pages.")
     if n > MAX_PAGE_COUNT:
-        raise ValueError(f"'{name}' has {n} pages — exceeds {MAX_PAGE_COUNT}.")
+        raise ValueError(f"'{name}' has {n} pages - exceeds {MAX_PAGE_COUNT}.")
     return n
 
 
-# ── Health ─────────────────────────────────────────────────────────────────
+# -- Health -----------------------------------------------------------------
 
 @router.get("/health")
 async def health():
-    """Health check — confirms the RAG API is running."""
+    """Health check - confirms the RAG API is running."""
     docs = get_all_documents()
     return {
         "status":        "ok",
@@ -97,14 +97,14 @@ async def health():
     }
 
 
-# ── Upload PDF ─────────────────────────────────────────────────────────────
+# -- Upload PDF -------------------------------------------------------------
 
 @router.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     """
     Upload and process a PDF through the full v1 RAG pipeline:
-    text extraction → chunking → OCR → FAISS + BM25 indexing
-    → metadata extraction → summary generation
+    text extraction -> chunking -> OCR -> FAISS + BM25 indexing
+    -> metadata extraction -> summary generation
     """
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
@@ -158,11 +158,11 @@ async def upload_pdf(file: UploadFile = File(...)):
         meta = extract_pdf_metadata(first_page, file.filename)
         update_document_metadata(doc_id, meta)
 
-        # Summary
-        summary = generate_paper_summary(doc_id, file.filename)
-        if summary:
-            update_document_summary(doc_id, summary)
-
+        # # Summary
+        # summary = generate_paper_summary(doc_id, file.filename)
+        # if summary:
+        #     update_document_summary(doc_id, summary)
+        summary = ""
         return {
             "status":      "success",
             "doc_id":      doc_id,
@@ -182,7 +182,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         os.unlink(tmp_path)
 
 
-# ── Chat ───────────────────────────────────────────────────────────────────
+# -- Chat -------------------------------------------------------------------
 
 @router.post("/chat")
 async def chat(request: ChatRequest):
@@ -226,7 +226,7 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
 
 
-# ── Compare ────────────────────────────────────────────────────────────────
+# -- Compare ----------------------------------------------------------------
 
 @router.post("/compare")
 async def compare(request: CompareRequest):
@@ -266,7 +266,7 @@ async def compare(request: CompareRequest):
         raise HTTPException(status_code=500, detail=f"Comparison failed: {e}")
 
 
-# ── Document Management ────────────────────────────────────────────────────
+# -- Document Management ----------------------------------------------------
 
 @router.get("/documents")
 async def list_documents():
@@ -308,6 +308,38 @@ async def get_document_info(doc_id: str):
         "summary":     doc.get("pdf_summary", ""),
     }
 
+# -- Summary -------------------------------------------------------------------
+
+@router.get("/documents/{doc_id}/summary")
+async def get_document_summary(doc_id: str):
+    """
+    Get summary for a PDF. Generates it on first request
+    and caches in SQLite for subsequent requests.
+    """
+    from pipeline.db import get_document, update_document_summary
+    from generation.generator import generate_paper_summary
+
+    doc = get_document(doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    meta    = doc.get("pdf_metadata") or {}
+    summary = doc.get("pdf_summary", "")
+
+    # Generate on demand if not yet created
+    if not summary:
+        summary = generate_paper_summary(doc_id, doc["filename"])
+        if summary:
+            update_document_summary(doc_id, summary)
+
+    return {
+        "doc_id":   doc_id,
+        "filename": doc["filename"],
+        "title":    meta.get("title", doc["filename"]),
+        "authors":  meta.get("authors", "Unknown"),
+        "abstract": meta.get("abstract", ""),
+        "summary":  summary,
+    }
 
 @router.delete("/documents/{doc_id}")
 async def delete_document_endpoint(doc_id: str):
@@ -347,7 +379,7 @@ async def delete_document_endpoint(doc_id: str):
         raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
 
 
-# ── Memory ─────────────────────────────────────────────────────────────────
+# -- Memory -----------------------------------------------------------------
 
 @router.delete("/memory")
 async def clear_memory():
@@ -376,7 +408,7 @@ async def clear_history():
     clear_question_history()
     return {"status": "ok", "message": "History cleared"}
 
-# ── Evaluation ─────────────────────────────────────────────────────────────
+# -- Evaluation -------------------------------------------------------------
 
 @router.post("/eval/score")
 async def score_queries(request: EvalRequest):

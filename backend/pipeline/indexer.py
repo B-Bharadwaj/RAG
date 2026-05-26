@@ -60,7 +60,7 @@ def _filter_exact_duplicates(new_docs: list[dict]) -> list[dict]:
     for doc in new_docs:
         h = _md5(doc["text"])
         if h in chunk_hashes:
-            print(f"  ⊘ Exact duplicate skipped: {doc['text'][:60]!r}")
+            print(f"    Exact duplicate skipped: {doc['text'][:60]!r}")
         else:
             chunk_hashes.add(h)
             survivors.append(doc)
@@ -92,7 +92,7 @@ def _filter_near_duplicates(new_docs: list[dict], new_embeddings: np.ndarray) ->
     survivors_idx = []
     for i, sim in enumerate(D[:, 0]):
         if sim >= DEDUP_COSINE_THRESHOLD:
-            print(f"  ⊘ Near-duplicate skipped (sim={sim:.3f}): {new_docs[i]['text'][:60]!r}")
+            print(f"    Near-duplicate skipped (sim={sim:.3f}): {new_docs[i]['text'][:60]!r}")
         else:
             survivors_idx.append(i)
 
@@ -129,7 +129,7 @@ def load_state():
             state = pickle.load(f)
         documents = state["documents"]
         texts = state["texts"]
-        # chunk_hashes may be absent in older pickles — rebuild from texts
+        # chunk_hashes may be absent in older pickles - rebuild from texts
         if "chunk_hashes" in state:
             chunk_hashes = state["chunk_hashes"]
         else:
@@ -201,12 +201,12 @@ def _add_to_per_doc_bm25(doc_id: str, new_docs: list[dict]):
 # ---------------------------------------------------------------------------
 
 def build_index(docs: list[dict]):
-    """Legacy / first-upload path — prefer add_to_index() for incremental adds."""
+    """Legacy / first-upload path - prefer add_to_index() for incremental adds."""
     global documents, texts, index, bm25, chunk_hashes
 
     docs = _filter_exact_duplicates(docs)
     if not docs:
-        print("All chunks were exact duplicates — nothing to index.")
+        print("All chunks were exact duplicates - nothing to index.")
         return
 
     documents = docs
@@ -238,7 +238,7 @@ def add_to_index(new_docs: list[dict]):
     if not new_docs:
         return
 
-    # ── Step 1: Exact dedup ──────────────────────────────────────────────
+    # -- Step 1: Exact dedup ----------------------------------------------
     before_exact = len(new_docs)
     new_docs = _filter_exact_duplicates(new_docs)
     after_exact = len(new_docs)
@@ -246,18 +246,18 @@ def add_to_index(new_docs: list[dict]):
         print(f"  Exact dedup: {before_exact - after_exact} chunks removed.")
 
     if not new_docs:
-        print("  All new chunks were exact duplicates — skipping.")
+        print("  All new chunks were exact duplicates - skipping.")
         return
 
     new_doc_id = new_docs[0].get("metadata", {}).get("doc_id", "unknown")
     new_texts = [doc["text"] for doc in new_docs]
 
-    # ── Step 2: Encode ───────────────────────────────────────────────────
+    # -- Step 2: Encode ---------------------------------------------------
     print(f"Encoding {len(new_docs)} new chunks...")
     new_embeddings = embed_model.encode(new_texts, show_progress_bar=True, batch_size=16)
     new_embeddings = np.array(new_embeddings, dtype=np.float32)
 
-    # ── Step 3: Near-duplicate dedup ─────────────────────────────────────
+    # -- Step 3: Near-duplicate dedup -------------------------------------
     before_near = len(new_docs)
     new_docs, new_embeddings = _filter_near_duplicates(new_docs, new_embeddings)
     after_near = len(new_docs)
@@ -265,10 +265,10 @@ def add_to_index(new_docs: list[dict]):
         print(f"  Near-dedup: {before_near - after_near} chunks removed.")
 
     if new_docs is None or len(new_docs) == 0:
-        print("  All new chunks were near-duplicates — skipping.")
+        print("  All new chunks were near-duplicates - skipping.")
         return
 
-    # ── Step 4: Add to FAISS ─────────────────────────────────────────────
+    # -- Step 4: Add to FAISS ---------------------------------------------
     if index is None:
         index = _build_faiss_from_embeddings(new_embeddings)
     else:

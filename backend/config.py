@@ -17,7 +17,7 @@ load_dotenv()
 
 
 def _require(key: str) -> str:
-    """Read a required env var — crash early with a clear message if missing."""
+    """Read a required env var - crash early with a clear message if missing."""
     value = os.getenv(key)
     if not value:
         raise EnvironmentError(
@@ -27,17 +27,17 @@ def _require(key: str) -> str:
     return value
 
 
-# ── API Keys ───────────────────────────────────────────────────────────────
+# -- API Keys ---------------------------------------------------------------
 GROQ_API_KEY = _require("GROQ_API_KEY")
 
-# ── Upload Limits ──────────────────────────────────────────────────────────
+# -- Upload Limits ----------------------------------------------------------
 MAX_FILE_SIZE_MB    = int(os.getenv("MAX_FILE_SIZE_MB", "50"))
 MAX_PAGE_COUNT      = int(os.getenv("MAX_PAGE_COUNT",   "100"))
 
-# ── Rate Limiting ──────────────────────────────────────────────────────────
+# -- Rate Limiting ----------------------------------------------------------
 MAX_REQUESTS_PER_MINUTE = int(os.getenv("MAX_REQUESTS_PER_MINUTE", "20"))
 
-# ── Model Names ────────────────────────────────────────────────────────────
+# -- Model Names ------------------------------------------------------------
 GROQ_MODEL_NAME     = "llama-3.1-8b-instant"           # generation (fast)
 GROQ_MODEL_LARGE    = "llama-3.3-70b-versatile"        # complex Q&A, anomaly detection
 GROQ_MODEL_SMALL    = "llama-3.1-8b-instant"           # summaries, simple tasks
@@ -45,32 +45,32 @@ GROQ_VISION_MODEL   = "meta-llama/llama-4-scout-17b-16e-instruct"
 EMBED_MODEL_NAME    = "all-MiniLM-L6-v2"
 RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
-# ── Chunking (for PDF text) ────────────────────────────────────────────────
+# -- Chunking (for PDF text) ------------------------------------------------
 CHUNK_SIZE    = 800
 CHUNK_OVERLAP = 200
 
-# ── Retrieval ──────────────────────────────────────────────────────────────
+# -- Retrieval --------------------------------------------------------------
 TOP_K            = 5
 RERANK_THRESHOLD = 0.5
 
-# ── FAISS ──────────────────────────────────────────────────────────────────
+# -- FAISS ------------------------------------------------------------------
 HNSW_NEIGHBORS       = 32
 HNSW_EF_CONSTRUCTION = 200
 
-# ── Parallel OCR ───────────────────────────────────────────────────────────
+# -- Parallel OCR -----------------------------------------------------------
 OCR_MAX_WORKERS = 4
 
-# ── Deduplication ──────────────────────────────────────────────────────────
+# -- Deduplication ----------------------------------------------------------
 DEDUP_COSINE_THRESHOLD = 0.95
 
-# ── Chat Memory ────────────────────────────────────────────────────────────
-MAX_HISTORY_TURNS = 4        # only last 4 messages sent to Groq — saves tokens
+# -- Chat Memory ------------------------------------------------------------
+MAX_HISTORY_TURNS = 4        # only last 4 messages sent to Groq - saves tokens
 
-# ── Pandas Context ─────────────────────────────────────────────────────────
+# -- Pandas Context ---------------------------------------------------------
 MAX_SAMPLE_ROWS   = 5        # rows shown to LLM as sample
 MAX_CONTEXT_CHARS = 3000     # max chars of data context sent per request
 
-# ── Paths ──────────────────────────────────────────────────────────────────
+# -- Paths ------------------------------------------------------------------
 STORAGE_DIR      = "storage"
 FAISS_INDEX_PATH = os.path.join(STORAGE_DIR, "index.faiss")
 METADATA_PATH    = os.path.join(STORAGE_DIR, "metadata.pkl")

@@ -1,74 +1,99 @@
 import { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { dataApi } from "../../api/client";
 import ChartRenderer from "../../components/data/ChartRenderer";
 import FileSelector from "../../components/data/FileSelector";
 import LoadingDots from "../../components/shared/LoadingDots";
 
 const CHART_TYPES = ["bar", "line", "pie", "hist", "scatter"];
+const AGGREGATIONS = ["count", "sum", "average", "min", "max"];
 
 export default function DataVisualize({ activeFileId, onFileSelect }) {
   const [fileId, setFileId] = useState(activeFileId || "");
   const [fileInfo, setFileInfo] = useState(null);
+  const [columns, setColumns] = useState([]);
+  const [colsLoading, setColsLoading] = useState(false);
 
+  // Chart builder
   const [chartType, setChartType] = useState("bar");
   const [xCol, setXCol] = useState("");
   const [yCol, setYCol] = useState("");
-  const [chartTitle, setChartTitle] = useState("");
+  const [aggregation, setAggregation] = useState("count");
+  const [filterValues, setFilterValues] = useState([]);
   const [chartData, setChartData] = useState(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError, setChartError] = useState("");
 
-  const [anomalies, setAnomalies] = useState([]);
-  const [anomalyExplanation, setAnomalyExplanation] = useState("");
+  // AI panels
+  const [anomalyText, setAnomalyText] = useState("");
   const [anomalyLoading, setAnomalyLoading] = useState(false);
-  const [anomalyError, setAnomalyError] = useState("");
+  const [fileInsights, setFileInsights] = useState("");
 
-  const [summary, setSummary] = useState(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-
-  useEffect(() => {
-    if (activeFileId) setFileId(activeFileId);
-  }, [activeFileId]);
+  useEffect(() => { if (activeFileId) setFileId(activeFileId); }, [activeFileId]);
 
   useEffect(() => {
     if (!fileId) return;
-    // FileInfoResponse: file_id, file_name, file_type, sheet_names, row_count, col_count
+    setColumns([]);
+    setXCol("");
+    setYCol("");
+    setFilterValues([]);
+    setChartData(null);
+    setAnomalyText("");
+
     dataApi.getFile(fileId)
-      .then((r) => setFileInfo(r.data))
-      .catch(() => {});
+      .then((r) => {
+        setFileInfo(r.data);
+        // Show insights from file info if present
+        if (r.data?.insights) setFileInsights(r.data.insights);
+      })
+      .catch(() => { });
+
+    setColsLoading(true);
+    dataApi.getColumnValues(fileId)
+      .then((r) => setColumns(r.data?.columns || []))
+      .catch(() => { })
+      .finally(() => setColsLoading(false));
   }, [fileId]);
 
   const handleSelectFile = (id) => {
     setFileId(id);
     setFileInfo(null);
     setChartData(null);
-    setAnomalies([]);
-    setAnomalyExplanation("");
-    setSummary(null);
     if (onFileSelect) onFileSelect(id);
   };
 
+  const xColMeta = columns.find((c) => c.name === xCol);
+  const isCategorical = xColMeta?.type === "categorical";
+  const showCheckboxes = isCategorical && (xColMeta?.unique_count || 0) <= 50;
+  const showTextFilter = isCategorical && (xColMeta?.unique_count || 0) > 50;
+  const showYCol = aggregation !== "count";
+  const numericCols = columns.filter((c) => c.type === "numeric");
+
+  const toggleFilter = (val) =>
+    setFilterValues((prev) =>
+      prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]
+    );
+  const selectAllFilters = () =>
+    setFilterValues(xColMeta?.unique_values?.map(String) || []);
+  const clearFilters = () => setFilterValues([]);
+
   const generateChart = async () => {
-    if (!fileId) return;
+    if (!fileId || !xCol) { setChartError("Please select an X column."); return; }
     setChartLoading(true);
     setChartError("");
     setChartData(null);
     try {
-      // ChartResponse: chart_id, file_id, title, file_path
-      // x_col and y_col are required by backend — validate before sending
-      if (!xCol) {
-        setChartError("Please select an X column.");
-        setChartLoading(false);
-        return;
-      }
       const res = await dataApi.generateChart(
-        fileId, chartType,
+        fileId,
+        chartType,
         xCol,
-        yCol || null,
-        chartTitle || null
+        showYCol ? (yCol || null) : null,
+        null,            // title — let backend auto-title
+        aggregation,
+        isCategorical && filterValues.length ? xCol : null,  // filter_col
+        filterValues,    // filter_values (empty = all)
       );
-      // Backend returns file_path for a saved chart image, not inline data
-      // We store the response to display what we can
       setChartData(res.data);
     } catch (e) {
       setChartError(e.message);
@@ -80,37 +105,16 @@ export default function DataVisualize({ activeFileId, onFileSelect }) {
   const loadAnomalies = async () => {
     if (!fileId) return;
     setAnomalyLoading(true);
-    setAnomalyError("");
+    setAnomalyText("");
     try {
-      // AnomalyResponse: file_id, anomalies[], explanation
       const res = await dataApi.getAnomalies(fileId);
-      setAnomalies(res.data?.anomalies || []);
-      setAnomalyExplanation(res.data?.explanation || "");
+      setAnomalyText(res.data?.explanation || "No anomalies detected.");
     } catch (e) {
-      setAnomalyError(e.message);
+      setAnomalyText("Failed to load anomaly analysis: " + e.message);
     } finally {
       setAnomalyLoading(false);
     }
   };
-
-  const loadSummary = async () => {
-    if (!fileId) return;
-    setSummaryLoading(true);
-    try {
-      // SummaryResponse: file_id, summary
-      const res = await dataApi.getSummary(fileId);
-      setSummary(res.data?.summary || "");
-    } catch (e) {
-      // silently fail
-    } finally {
-      setSummaryLoading(false);
-    }
-  };
-
-  // Backend FileInfoResponse uses sheet_names (not column_names)
-  // Columns come from sheet_names for Excel; for CSV there's typically one sheet
-  const cols = fileInfo?.column_names || fileInfo?.columns || [];
-  const sheets = fileInfo?.sheet_names || [];
 
   return (
     <div className="page-content">
@@ -118,7 +122,7 @@ export default function DataVisualize({ activeFileId, onFileSelect }) {
         <div className="page-header">
           <div className="page-header-left">
             <h1>Visualize</h1>
-            <p>Build charts, detect anomalies, and get AI-driven insights</p>
+            <p>SQL-powered chart builder with AI insights</p>
           </div>
           <div className="page-header-actions">
             <FileSelector selectedId={fileId} onSelect={handleSelectFile} />
@@ -128,219 +132,160 @@ export default function DataVisualize({ activeFileId, onFileSelect }) {
         {!fileId ? (
           <div className="empty-state">
             <div className="empty-state-title">No file selected</div>
-            <p>Select a file to start visualizing your data.</p>
+            <p>Select a file to start visualizing.</p>
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 20 }}>
-            {/* Left: controls */}
+
+            {/* ── Left controls ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div className="card">
                 <div className="card-title">Chart Builder</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                  {/* Row 1: Chart type */}
                   <div>
                     <label className="field-label">Chart Type</label>
                     <div className="chip-list">
                       {CHART_TYPES.map((t) => (
-                        <button
-                          key={t}
-                          className={`chip${chartType === t ? " selected" : ""}`}
+                        <button key={t} className={`chip${chartType === t ? " selected" : ""}`}
                           onClick={() => setChartType(t)}
-                          style={{ textTransform: "uppercase", fontSize: 11, letterSpacing: "0.04em" }}
-                        >
+                          style={{ textTransform: "uppercase", fontSize: 11 }}>
                           {t}
                         </button>
                       ))}
                     </div>
                   </div>
 
+                  {/* Row 2: X column */}
                   <div>
-                    <label className="field-label">X Column <span style={{ color: "var(--danger)" }}>*</span></label>
-                    {cols.length > 0 ? (
-                      <select className="select" value={xCol} onChange={(e) => setXCol(e.target.value)}>
-                        <option value="">Select column…</option>
-                        {cols.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    ) : (
-                      <input
-                        className="input"
-                        placeholder="e.g. Month, Category, Date"
-                        value={xCol}
-                        onChange={(e) => setXCol(e.target.value)}
-                      />
-                    )}
+                    <label className="field-label">
+                      X Axis Column <span style={{ color: "var(--danger)" }}>*</span>
+                      {colsLoading && <span className="text-muted" style={{ fontSize: 10, marginLeft: 6 }}>loading…</span>}
+                    </label>
+                    <select className="select" value={xCol}
+                      onChange={(e) => { setXCol(e.target.value); setFilterValues([]); }}>
+                      <option value="">Select column…</option>
+                      {columns.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.name} ({c.type}{c.unique_count ? `, ${c.unique_count} unique` : ""})
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
+                  {/* Row 3: Filter values (categorical only, ≤50 unique) */}
+                  {showCheckboxes && xColMeta?.unique_values?.length > 0 && (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <label className="field-label" style={{ margin: 0 }}>
+                          Filter Values
+                          <span className="text-muted" style={{ fontSize: 10, marginLeft: 6 }}>
+                            ({filterValues.length === 0 ? "all" : `${filterValues.length} selected`})
+                          </span>
+                        </label>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button type="button" onClick={selectAllFilters} style={{ fontSize: 11, color: "var(--brand-primary)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>All</button>
+                          <button type="button" onClick={clearFilters} style={{ fontSize: 11, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Clear</button>
+                        </div>
+                      </div>
+                      <div style={{ maxHeight: 180, overflowY: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "8px 10px", background: "var(--bg-elevated)", display: "flex", flexDirection: "column", gap: 6 }}>
+                        {xColMeta.unique_values.map((val) => (
+                          <label key={String(val)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
+                            <input
+                              type="checkbox"
+                              checked={filterValues.includes(String(val))}
+                              onChange={() => toggleFilter(String(val))}
+                              style={{ accentColor: "var(--brand-primary)" }}
+                            />
+                            {String(val)}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Text filter for high-cardinality */}
+                  {showTextFilter && (
+                    <div>
+                      <label className="field-label">Filter Value (text match)</label>
+                      <input
+                        className="input"
+                        placeholder="Type a value to filter…"
+                        value={filterValues[0] || ""}
+                        onChange={(e) => setFilterValues(e.target.value ? [e.target.value] : [])}
+                      />
+                    </div>
+                  )}
+
+                  {/* Row 4: Aggregation */}
                   <div>
-                    <label className="field-label">Y Column</label>
-                    {cols.length > 0 ? (
+                    <label className="field-label">Aggregation</label>
+                    <select className="select" value={aggregation} onChange={(e) => setAggregation(e.target.value)}>
+                      {AGGREGATIONS.map((a) => (
+                        <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Row 5: Y column (only for sum/average/min/max) */}
+                  {showYCol && (
+                    <div>
+                      <label className="field-label">Y Axis Column</label>
                       <select className="select" value={yCol} onChange={(e) => setYCol(e.target.value)}>
-                        <option value="">Auto-detect</option>
-                        {cols.map((c) => <option key={c} value={c}>{c}</option>)}
+                        <option value="">Auto-detect numeric</option>
+                        {numericCols.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
                       </select>
-                    ) : (
-                      <input
-                        className="input"
-                        placeholder="e.g. Revenue, Count, Value"
-                        value={yCol}
-                        onChange={(e) => setYCol(e.target.value)}
-                      />
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="field-label">Title (optional)</label>
-                    <input
-                      className="input"
-                      placeholder="Chart title..."
-                      value={chartTitle}
-                      onChange={(e) => setChartTitle(e.target.value)}
-                    />
-                  </div>
-
-                  <button
-                    className="btn btn-primary"
-                    onClick={generateChart}
-                    disabled={chartLoading || !xCol}
-                  >
+                  {/* Row 6: Generate */}
+                  <button className="btn btn-primary" onClick={generateChart} disabled={chartLoading || !xCol}>
                     {chartLoading ? <><span className="spinner" /> Generating…</> : "Generate Chart"}
                   </button>
                 </div>
               </div>
 
-              <div className="card">
-                <div className="card-title">AI Analysis</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <button className="btn btn-secondary" onClick={loadAnomalies} disabled={anomalyLoading}>
-                    {anomalyLoading ? <><span className="spinner" /> Detecting…</> : "Detect Anomalies"}
-                  </button>
-                  <button className="btn btn-secondary" onClick={loadSummary} disabled={summaryLoading}>
-                    {summaryLoading ? <><span className="spinner" /> Summarizing…</> : "Get AI Summary"}
-                  </button>
-                </div>
-              </div>
-
+              {/* File info */}
               {fileInfo && (
                 <div className="card">
                   <div className="card-title">File Info</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {[
-                      ["Name",    fileInfo.file_name],
-                      ["Type",    fileInfo.file_type?.toUpperCase()],
-                      ["Rows",    fileInfo.row_count?.toLocaleString()],
-                      ["Columns", fileInfo.col_count],
-                    ].map(([k, v]) => v != null && (
-                      <div key={k} style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span className="text-muted text-sm">{k}</span>
-                        <span className="text-sm text-mono">{v}</span>
-                      </div>
-                    ))}
+                    {[["Name", fileInfo.file_name], ["Type", fileInfo.file_type?.toUpperCase()], ["Rows", fileInfo.row_count?.toLocaleString()], ["Columns", fileInfo.col_count]]
+                      .filter(([, v]) => v != null)
+                      .map(([k, v]) => (
+                        <div key={k} style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span className="text-muted text-sm">{k}</span>
+                          <span className="text-sm text-mono">{v}</span>
+                        </div>
+                      ))}
                   </div>
-                  {sheets.length > 0 && (
-                    <div style={{ marginTop: 12 }}>
-                      <div className="text-sm text-muted mb-8">Sheets</div>
-                      <div className="chip-list">
-                        {sheets.map((s) => (
-                          <span key={s} className="chip" style={{ fontSize: 11, cursor: "default" }}>{s}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
 
-            {/* Right: output */}
+            {/* ── Right output ── */}
             <div>
               {chartError && <div className="error-banner mb-12">{chartError}</div>}
+              {chartLoading && (
+                <div className="card mb-16" style={{ textAlign: "center", padding: 40 }}>
+                  <LoadingDots />
+                  <p style={{ marginTop: 12, fontSize: 13 }}>Running SQL query…</p>
+                </div>
+              )}
 
               {chartData && (
-                <div className="section">
-                  <div className="section-title">Chart Output</div>
-                  <div className="chart-box">
-                    <div style={{ fontWeight: 600, marginBottom: 8 }}>
-                      {chartData.title || chartTitle || "Chart Generated"}
-                    </div>
-                    <div style={{ color: "var(--text-muted)", fontSize: 12 }}>
-                      Chart ID: <span className="text-mono">{chartData.chart_id}</span>
-                    </div>
-                    {chartData.file_path && (
-                      <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg-elevated)", borderRadius: "var(--radius)", fontSize: 12, color: "var(--text-muted)" }}>
-                        Saved to: <span className="text-mono">{chartData.file_path}</span>
-                      </div>
-                    )}
-                  </div>
+                <div className="section mb-16">
+                  <div className="section-title">Chart</div>
+                  <ChartRenderer chart={chartData} height={400} />
                 </div>
               )}
 
-              {summary && (
+              {/* Panel 1: AI Insights from upload */}
+              {fileInsights && (
                 <div className="card mb-16">
-                  <div className="card-title">AI Summary</div>
-                  <div style={{ color: "var(--text-secondary)", fontSize: 13.5, lineHeight: 1.75 }}>
-                    {summary}
-                  </div>
-                </div>
-              )}
-
-              {summaryLoading && (
-                <div className="card mb-16" style={{ textAlign: "center", padding: 32 }}>
-                  <LoadingDots />
-                  <p style={{ marginTop: 12, fontSize: 13 }}>Generating AI summary…</p>
-                </div>
-              )}
-
-              {anomalyError && <div className="error-banner mb-12">{anomalyError}</div>}
-
-              {(anomalies.length > 0 || anomalyExplanation) && (
-                <div className="section">
-                  <div className="section-title">Detected Anomalies ({anomalies.length})</div>
-
-                  {anomalyExplanation && (
-                    <div className="card mb-12">
-                      <div className="card-title">AI Explanation</div>
-                      <p style={{ fontSize: 13.5, lineHeight: 1.75 }}>{anomalyExplanation}</p>
-                    </div>
-                  )}
-
-                  {anomalies.map((a, i) => {
-                    const severity = a.severity || "medium";
-                    return (
-                      <div key={i} className={`anomaly-card ${severity}`}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                          <div className="anomaly-title">
-                            {a.column || a.field || `Anomaly ${i + 1}`}
-                            {a.row_index != null && (
-                              <span className="text-muted text-sm" style={{ marginLeft: 8 }}>
-                                Row {a.row_index}
-                              </span>
-                            )}
-                          </div>
-                          <span className={`badge ${severity === "high" ? "badge-danger" : severity === "low" ? "badge-info" : "badge-warning"}`}>
-                            {severity}
-                          </span>
-                        </div>
-                        <div className="anomaly-desc">{a.description || a.message || "—"}</div>
-                        {a.value != null && (
-                          <div className="text-mono text-sm" style={{ marginTop: 4 }}>
-                            Value: {String(a.value)}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {anomalyLoading && (
-                <div className="card" style={{ textAlign: "center", padding: 32 }}>
-                  <LoadingDots />
-                  <p style={{ marginTop: 12, fontSize: 13 }}>Scanning for anomalies…</p>
-                </div>
-              )}
-
-              {!chartData && !summary && !anomalies.length && !chartLoading && !summaryLoading && !anomalyLoading && (
-                <div className="empty-state" style={{ paddingTop: 60 }}>
-                  <div className="empty-state-title">Nothing generated yet</div>
-                  <p>Use the controls on the left to generate a chart or run analysis.</p>
+                  <div className="card-title">AI Insights</div>
+                  <p style={{ fontSize: 13.5, lineHeight: 1.8, color: "var(--text-secondary)" }}>{fileInsights}</p>
                 </div>
               )}
             </div>

@@ -73,7 +73,7 @@ def _is_reference_chunk(text: str) -> bool:
     citation_count = len(re.findall(r'\[\d{2,3}\]', text))
     if citation_count >= 3:
         return True
-    # arXiv IDs — very specific to reference sections
+    # arXiv IDs - very specific to reference sections
     arxiv_count = len(re.findall(r'arXiv[:\s]\d{4}\.\d{4,5}', text))
     if arxiv_count >= 3:
         return True

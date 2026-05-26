@@ -2,7 +2,7 @@
 services/analyzer.py
 
 Orchestrates the full analysis pipeline for an uploaded business file.
-Ties together: loader → PostgreSQL → generator → db
+Ties together: loader -> PostgreSQL -> generator -> db
 
 v3 changes:
     - Summary generation uses SQL queries instead of stats compression
@@ -55,26 +55,34 @@ except Exception:
     log = _Log()
 
 
-# ── Cache helpers ──────────────────────────────────────────────────────────
+# -- Cache helpers ----------------------------------------------------------
+
+# Module-level cache - persists for the lifetime of the FastAPI process
+_file_cache: dict = {}
 
 def _get_cache() -> dict:
-    """Return the file cache from Streamlit session state."""
-    if "_file_cache" not in st.session_state:
-        st.session_state["_file_cache"] = {}
-    return st.session_state["_file_cache"]
-
+    return _file_cache
 
 def get_cached_file(file_id: str) -> dict | None:
-    """Return cached file data for a file_id."""
-    return _get_cache().get(file_id)
+    """Return cached file data - auto restores from disk if not in memory."""
+    cached = _file_cache.get(file_id)
+    if cached:
+        return cached
 
+    # Not in memory - try to restore from disk automatically
+    log.info("File %s not in cache - attempting restore from disk", file_id)
+    restored = restore_file_from_disk(file_id)
+    if restored:
+        return _file_cache.get(file_id)
+
+    return None
 
 def get_all_cached_files() -> list[str]:
     """Return all file_ids currently in memory."""
-    return list(_get_cache().keys())
+    return list(_file_cache.keys())
 
 
-# ── File Upload & Processing ───────────────────────────────────────────────
+# -- File Upload & Processing -----------------------------------------------
 
 def process_uploaded_file(
     file_bytes: bytes,
@@ -116,17 +124,17 @@ def process_uploaded_file(
     # Load file using Pandas (file I/O only)
     file_data = load_file(save_path, file_name)
 
-    # Process file — keep for fallback context + shape info
+    # Process file - keep for fallback context + shape info
     processed = process_file(file_data, sheet_name)
 
-    # ── Load into PostgreSQL ───────────────────────────────────────────────
+    # -- Load into PostgreSQL -----------------------------------------------
     table_map = {}
     try:
         if test_connection():
             table_map = load_file_to_postgres(file_data, file_id)
             log.info("PostgreSQL tables created: %s", table_map)
         else:
-            log.warning("PostgreSQL not reachable — skipping SQL load")
+            log.warning("PostgreSQL not reachable - skipping SQL load")
     except Exception as e:
         log.error("PostgreSQL load failed: %s", e)
 
@@ -138,7 +146,7 @@ def process_uploaded_file(
         "table_map": table_map,
     }
 
-    # ── Generate SQL-driven insights ───────────────────────────────────────
+    # -- Generate SQL-driven insights ---------------------------------------
     insights = ""
     try:
         table_names = list(table_map.values())
@@ -167,7 +175,7 @@ def process_uploaded_file(
     except Exception as e:
         log.error("SQL-driven insights failed: %s", e)
 
-    # ── Register in PostgreSQL ─────────────────────────────────────────────
+    # -- Register in PostgreSQL ---------------------------------------------
     if not business_file_exists(file_name):
         register_business_file(
             file_id     = file_id,
@@ -196,7 +204,7 @@ def process_uploaded_file(
     }
 
 
-# ── Restore from disk on server restart ───────────────────────────────────
+# -- Restore from disk on server restart -----------------------------------
 
 def restore_file_from_disk(file_id: str) -> bool:
     """
@@ -220,7 +228,7 @@ def restore_file_from_disk(file_id: str) -> bool:
         file_data = load_file(save_path, db_file["file_name"])
         processed = process_file(file_data)
 
-        # Rebuild table_map — tables already exist in PostgreSQL
+        # Rebuild table_map - tables already exist in PostgreSQL
         table_map = {}
         try:
             if test_connection():
@@ -246,7 +254,7 @@ def restore_file_from_disk(file_id: str) -> bool:
         return False
 
 
-# ── Q&A ────────────────────────────────────────────────────────────────────
+# -- Q&A --------------------------------------------------------------------
 
 def answer_question(
     file_id:    str,
@@ -283,7 +291,7 @@ def answer_question(
     df        = cached["file_data"].dataframes.get(sheet)
     context   = cached["processed"].get("context", "")
 
-    # ── Try Text-to-SQL ────────────────────────────────────────────────────
+    # -- Try Text-to-SQL ----------------------------------------------------
     if table_map:
         try:
             table_names = list(table_map.values())
@@ -361,7 +369,7 @@ def answer_question(
         except Exception as e:
             log.error("Text-to-SQL pipeline failed: %s", e)
 
-    # ── Fallback — stats based ─────────────────────────────────────────────
+    # -- Fallback - stats based ---------------------------------------------
     log.info("Falling back to stats-based answer for: %s", query)
     answer, follow_ups, chart_result = ask_business_question_with_chart(
         query     = query,
@@ -387,7 +395,7 @@ def answer_question(
     }
 
 
-# ── Executive Summary ──────────────────────────────────────────────────────
+# -- Executive Summary ------------------------------------------------------
 
 def get_executive_summary(file_id: str) -> str:
     """
@@ -440,7 +448,7 @@ def get_executive_summary(file_id: str) -> str:
     )
 
 
-# ── Anomaly Explanation ────────────────────────────────────────────────────
+# -- Anomaly Explanation ----------------------------------------------------
 
 def get_anomaly_explanation(file_id: str) -> str:
     """

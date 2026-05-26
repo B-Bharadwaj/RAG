@@ -1,11 +1,11 @@
-
 import { useNavigate, useLocation } from "react-router-dom";
+import { RAGBotIcon } from "./Icon";
 
 export default function TopNav({ mode, onModeChange }) {
   return (
     <nav className="topnav">
       <span className="topnav-brand">
-        <span></span>RAGBOT
+        <RAGBotIcon /><span>RAGBOT</span>
       </span>
       <div className="mode-toggle">
         <button

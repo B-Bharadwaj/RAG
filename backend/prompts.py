@@ -5,17 +5,17 @@ All LLM prompts for v2 Business Intelligence Edition.
 Keeping prompts in one place makes them easy to tune and version.
 
 Prompts:
-    SYSTEM_ANALYST      — base system prompt for business Q&A
-    QA_PROMPT           — question answering on tabular data
-    INSIGHT_PROMPT      — auto insight generation
-    SUMMARY_PROMPT      — executive summary generation
-    ANOMALY_PROMPT      — anomaly explanation
-    FOLLOWUP_PROMPT     — follow up question suggestions
-    PDF_QA_PROMPT       — Q&A on PDF business reports
+    SYSTEM_ANALYST      - base system prompt for business Q&A
+    QA_PROMPT           - question answering on tabular data
+    INSIGHT_PROMPT      - auto insight generation
+    SUMMARY_PROMPT      - executive summary generation
+    ANOMALY_PROMPT      - anomaly explanation
+    FOLLOWUP_PROMPT     - follow up question suggestions
+    PDF_QA_PROMPT       - Q&A on PDF business reports
 """
 
 
-# ── System Prompt ──────────────────────────────────────────────────────────
+# -- System Prompt ----------------------------------------------------------
 
 SYSTEM_ANALYST = """\
 You are an expert business data analyst assistant.
@@ -24,17 +24,17 @@ Your job is to answer questions accurately based ONLY on the provided data conte
 
 RULES:
 1. Answer using ONLY what is in the data context provided.
-2. Be concise and business-friendly — avoid technical jargon.
+2. Be concise and business-friendly - avoid technical jargon.
 3. Always include specific numbers and percentages in your answers.
 4. If the data context does not contain enough info, say so clearly.
 5. Never fabricate numbers or trends not present in the context.
-6. Format currency values clearly (e.g. $1,234.56 or ₹1,234.56).
+6. Format currency values clearly (e.g. $1,234.56 or  1,234.56).
 7. When comparing values, always mention both values explicitly.
 8. End answers with CONFIDENCE: High / Medium / Low based on data available.
 """
 
 
-# ── Q&A Prompt ─────────────────────────────────────────────────────────────
+# -- Q&A Prompt -------------------------------------------------------------
 
 QA_PROMPT = """\
 You are analyzing a business dataset. Answer the question below using
@@ -47,10 +47,10 @@ QUESTION:
 {question}
 
 RULES:
-- Be specific — include exact numbers from the context
-- If asking about totals, sums, or counts — use the statistics provided
-- If asking about trends — reference the min/max/mean values
-- If the answer cannot be determined from the context — say so clearly
+- Be specific - include exact numbers from the context
+- If asking about totals, sums, or counts - use the statistics provided
+- If asking about trends - reference the min/max/mean values
+- If the answer cannot be determined from the context - say so clearly
 - Keep your answer concise (3-5 sentences max unless a detailed breakdown is needed)
 - End with: CONFIDENCE: High / Medium / Low
 
@@ -58,7 +58,7 @@ ANSWER:
 """
 
 
-# ── Insight Prompt ─────────────────────────────────────────────────────────
+# -- Insight Prompt ---------------------------------------------------------
 
 INSIGHT_PROMPT = """\
 You are a senior business analyst. Analyze this dataset summary and generate
@@ -90,7 +90,7 @@ INSIGHTS:
 """
 
 
-# ── Executive Summary Prompt ───────────────────────────────────────────────
+# -- Executive Summary Prompt -----------------------------------------------
 
 SUMMARY_PROMPT = """\
 You are a business analyst writing an executive summary for a senior manager.
@@ -103,13 +103,13 @@ FILE NAME: {file_name}
 
 Write the executive summary in exactly this structure:
 
-EXECUTIVE SUMMARY — {file_name}
+EXECUTIVE SUMMARY - {file_name}
 
 OVERVIEW:
 [2-3 sentences describing what this dataset contains and its overall scale]
 
 KEY METRICS:
-[3-5 most important numbers from the data — formatted as bullet points]
+[3-5 most important numbers from the data - formatted as bullet points]
 
 KEY FINDINGS:
 [3-4 most important observations from the data]
@@ -127,7 +127,7 @@ EXECUTIVE SUMMARY:
 """
 
 
-# ── Anomaly Explanation Prompt ─────────────────────────────────────────────
+# -- Anomaly Explanation Prompt ---------------------------------------------
 
 ANOMALY_PROMPT = """\
 You are a data quality expert. Explain the following anomalies found in a
@@ -144,13 +144,13 @@ For each anomaly:
 2. Suggest a likely business reason for it
 3. Recommend what action to take
 
-Keep explanations simple — the audience is business users, not data scientists.
+Keep explanations simple - the audience is business users, not data scientists.
 
 ANOMALY EXPLANATIONS:
 """
 
 
-# ── Follow-up Suggestions Prompt ───────────────────────────────────────────
+# -- Follow-up Suggestions Prompt -------------------------------------------
 
 FOLLOWUP_PROMPT = """\
 The user just asked this question about a business dataset:
@@ -169,7 +169,7 @@ FOLLOW-UP QUESTIONS:
 """
 
 
-# ── PDF Business Report Q&A Prompt ────────────────────────────────────────
+# -- PDF Business Report Q&A Prompt ----------------------------------------
 
 PDF_QA_PROMPT = """\
 You are a business analyst answering questions about a business report.
@@ -192,7 +192,7 @@ ANSWER:
 """
 
 
-# ── Chart Title Generator ──────────────────────────────────────────────────
+# -- Chart Title Generator --------------------------------------------------
 
 CHART_TITLE_PROMPT = """\
 Generate a short, clear chart title for a {chart_type} chart
@@ -217,13 +217,18 @@ DATABASE SCHEMA:
 USER QUESTION: {question}
 
 Rules:
-- Return ONLY the raw SQL query — no explanation, no markdown, no backticks
+- Return ONLY the raw SQL query - no explanation, no markdown, no backticks
 - Always use double quotes around table and column names
 - Use aggregations (SUM, COUNT, AVG, MIN, MAX) where appropriate
-- Always add ORDER BY for ranking or comparison questions
+- Only add ORDER BY when the query returns multiple rows (GROUP BY queries)
+- Never add ORDER BY to queries that return a single aggregated value (COUNT(*), SUM, AVG without GROUP BY)
+- Never add ORDER BY columns that are not in the SELECT clause
 - Add LIMIT 20 unless the question asks for all records
 - For date/time filtering use CAST or TO_CHAR where needed
 - If the question cannot be answered with SQL return exactly: NOT_SQL
+- When the question asks to compare specific values across a category
+  always use GROUP BY and aggregation - never use SELECT *
+- SELECT * is only allowed when the question asks for raw records or specific individuals
 
 SQL:
 """
@@ -258,7 +263,7 @@ DATABASE SCHEMA:
 {schema}
 
 Rules:
-- Return ONLY a JSON array of 5 SQL strings — no explanation, no markdown
+- Return ONLY a JSON array of 5 SQL strings - no explanation, no markdown
 - Each query should answer a different analytical question
 - Use aggregations, GROUP BY, ORDER BY where appropriate
 - Always use double quotes around table and column names
@@ -281,10 +286,11 @@ QUERY RESULTS:
 {results}
 
 Write a clear summary with exactly these 4 sections:
-1. Dataset Overview — what the data is about, how many records
-2. Key Findings — 3 most important insights from the data
-3. Notable Patterns — any interesting distributions or trends
-4. Data Quality — any concerns about completeness or consistency
+1. Dataset Overview - what the data is about, how many records
+2. Key Findings - 3 most important insights from the data
+3. Notable Patterns - any interesting distributions or trends
+4. Recommendations - 2-3 specific actionable recommendations
+   a business manager could take based on this data
 
 Keep it under 200 words. Use specific numbers from the results.
 """
@@ -300,7 +306,7 @@ DATABASE SCHEMA:
 Write exactly these 4 queries:
 1. Count of NULL values per column
 2. Find duplicate records if any
-3. Find outliers — values far from the average (use WHERE value > AVG + 2*STDDEV)
+3. Find outliers - values far from the average (use WHERE value > AVG + 2*STDDEV)
 4. Find any suspicious patterns (e.g. negative values, zero values in unexpected columns)
 
 Rules:
@@ -347,29 +353,45 @@ SPECIFIC VALUES DETECTED IN QUESTION:
 USER QUESTION: {question}
 
 Rules:
-- Return ONLY a JSON object — no explanation, no markdown
+- Return ONLY a JSON object - no explanation, no markdown
 - The JSON must have exactly these fields:
-    sql        → the PostgreSQL query to run
-    chart_type → one of: bar, line, pie, scatter, hist
-    x_col      → the column name to use for X axis or labels
-    y_col      → the column name to use for Y axis or values
-    title      → a short descriptive chart title
+    sql        -> the PostgreSQL query to run
+    chart_type -> one of: bar, line, pie, scatter, hist
+    x_col      -> the column name to use for X axis or labels
+    y_col      -> the column name to use for Y axis or values
+    color_col  -> the column name to use for grouping/coloring (or null if none)
+    title      -> a short descriptive chart title
 
 SQL Writing Rules:
-- If specific values are detected → use WHERE "column" IN ('value1', 'value2')
-  to filter to ONLY those values — never show the whole column
-- If question asks "top N" → use ORDER BY + LIMIT N
-- If no specific values → use ORDER BY value DESC LIMIT 10 to show top 10 only
+- If specific values are detected -> use WHERE "column" IN ('value1', 'value2')
+  to filter to ONLY those values - never show the whole column
+- If question asks "top N" -> use ORDER BY + LIMIT N
+- If no specific values -> use ORDER BY value DESC LIMIT 10 to show top 10 only
 - Always use GROUP BY with COUNT(*) or SUM() or AVG() for aggregations
 - Always use double quotes around table and column names
-- Never return more than 15 rows — add LIMIT if needed
-- For comparisons between 2-3 values → use WHERE IN and bar chart
-- For trends over time → use line chart with date column on X axis
-- For distributions → use hist chart type with numeric column
-- For proportions → use pie chart with LIMIT 8 max
+- Never return more than 15 rows - add LIMIT if needed
+- For comparisons between 2-3 values -> use WHERE IN and bar chart
+- For trends over time -> use line chart with date column on X axis
+- For distributions -> use hist chart type with numeric column
+- For proportions -> use pie chart with LIMIT 8 max
+
+CRITICAL SQL RULES FOR CHARTS:
+- When question asks to COMPARE groups (Male vs Female, City A vs City B)
+  -> ALWAYS use COUNT(*) as the metric - never use SUM or AVG of unrelated columns
+- When question asks for distribution of a numeric column
+  -> use the numeric column directly on X axis with COUNT(*) on Y axis
+- When question asks "how many" or "count" or "compare groups"
+  -> the Y axis must always be COUNT(*) or a sum of a business metric column
+- NEVER use Age, ID, or index columns as the value being measured
+  unless the question explicitly asks about age
+- For "Male vs Female" -> SELECT "Gender", COUNT(*) GROUP BY "Gender"
+- For "by city" -> SELECT "City", COUNT(*) GROUP BY "City" ORDER BY count DESC LIMIT 10
+- If the question asks to compare subgroups across a main category (e.g. "Bachelors vs Masters by Gender"):
+  -> Use GROUP BY on both columns and specify the secondary grouping column as color_col.
+- A column mentioned after the word "by" (e.g., "by Gender") strongly indicates it should be the color_col.
 
 If the question cannot be charted return:
-{{"sql": "NOT_SQL", "chart_type": "", "x_col": "", "y_col": "", "title": ""}}
+{{"sql": "NOT_SQL", "chart_type": "", "x_col": "", "y_col": "", "color_col": "", "title": ""}}
 
 JSON:
 """

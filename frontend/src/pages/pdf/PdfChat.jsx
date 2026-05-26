@@ -3,6 +3,62 @@ import { pdfApi } from "../../api/client";
 import LoadingDots from "../../components/shared/LoadingDots";
 import MarkdownContent from "../../components/shared/MarkdownContent";
 
+function SourcesDropdown({ sources }) {
+  const [open, setOpen] = useState(false);
+  if (!sources?.length) return null;
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius)",
+          cursor: "pointer", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em",
+          color: "var(--text-muted)", padding: "4px 10px", display: "inline-flex",
+          alignItems: "center", gap: 6, transition: "all var(--transition)",
+        }}
+      >
+        <span style={{ fontSize: 10 }}>{open ? "▼" : "▶"}</span>
+        View Sources ({sources.length})
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+          {sources.map((s, i) => (
+            <div key={i} style={{
+              background: "var(--bg-elevated)", border: "1px solid var(--border)",
+              borderRadius: "var(--radius)", padding: "10px 14px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, fontSize: 12, color: "var(--brand-primary)" }}>
+                  {s.pdf || s.filename || s.source || s.doc_id || `Source ${i + 1}`}
+                </span>
+                {(s.page || s.page_number) && (
+                  <span className="badge badge-neutral" style={{ fontSize: 10 }}>
+                    p.{s.page || s.page_number}
+                  </span>
+                )}
+                {s.score != null && (
+                  <span className="badge badge-info" style={{ fontSize: 10 }}>
+                    {Math.round(s.score * 100)}%
+                  </span>
+                )}
+              </div>
+              {(s.preview || s.text) && (
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0, lineHeight: 1.6 }}>
+                  {(s.preview || s.text || "").slice(0, 150)}
+                  {(s.preview || s.text || "").length > 150 ? "…" : ""}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PdfChat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -12,27 +68,25 @@ export default function PdfChat() {
   const [selectedDocId, setSelectedDocId] = useState("all");
   const bottomRef = useRef();
 
-  // Fetch documents + history on mount
   useEffect(() => {
     pdfApi.listDocuments()
       .then((r) => setDocuments(r.data?.documents || r.data || []))
-      .catch(() => {});
+      .catch(() => { });
 
     pdfApi.getHistory()
       .then((r) => {
         const hist = r.data?.history || r.data || [];
         if (hist.length) {
           const msgs = hist.flatMap((h) => [
-            { role: "user",      content: h.query || h.question },
+            { role: "user", content: h.query || h.question },
             { role: "assistant", content: h.answer, sources: h.sources || [] },
           ]);
           setMessages(msgs);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
@@ -59,10 +113,10 @@ export default function PdfChat() {
     }
   };
 
-  // Clear Memory = wipe LLM memory + wipe SQLite history + wipe UI
+  // Clear memory — only resets local state, no confirm popup
   const clearMemory = () => {
-    pdfApi.clearMemory().catch(() => {});
-    pdfApi.clearHistory().catch(() => {});
+    pdfApi.clearMemory().catch(() => { });
+    pdfApi.clearHistory().catch(() => { });
     setMessages([]);
     setError("");
   };
@@ -71,7 +125,7 @@ export default function PdfChat() {
     selectedDocId === "all"
       ? "All Documents"
       : (documents.find((d) => (d.id || d.doc_id) === selectedDocId)?.filename || "Selected PDF")
-          .replace(/\.pdf$/i, "");
+        .replace(/\.pdf$/i, "");
 
   return (
     <div className="chat-layout">
@@ -85,27 +139,21 @@ export default function PdfChat() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <label className="field-label" style={{ margin: 0, whiteSpace: "nowrap" }}>Search in</label>
-            <select
-              className="select"
-              style={{ width: "auto", minWidth: 220 }}
-              value={selectedDocId}
-              onChange={(e) => setSelectedDocId(e.target.value)}
-            >
-              <option value="all">All Documents</option>
-              {documents.map((d) => {
-                const id = d.id || d.doc_id;
-                const name = (d.filename || d.title || id).replace(/\.pdf$/i, "");
-                return <option key={id} value={id}>{name}</option>;
-              })}
-            </select>
-          </div>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={clearMemory}
+          <label className="field-label" style={{ margin: 0, whiteSpace: "nowrap" }}>Search in</label>
+          <select
+            className="select"
+            style={{ width: "auto", minWidth: 220 }}
+            value={selectedDocId}
+            onChange={(e) => setSelectedDocId(e.target.value)}
           >
+            <option value="all">All Documents</option>
+            {documents.map((d) => {
+              const id = d.id || d.doc_id;
+              const name = (d.filename || d.title || id).replace(/\.pdf$/i, "");
+              return <option key={id} value={id}>{name}</option>;
+            })}
+          </select>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={clearMemory}>
             Clear Memory
           </button>
         </div>
@@ -116,10 +164,9 @@ export default function PdfChat() {
         {messages.length === 0 && !loading && (
           <div className="empty-state">
             <div className="empty-state-title">No conversation yet</div>
-            <p>
-              {documents.length === 0
-                ? "Upload PDFs first, then come back to chat."
-                : "Select a document or search all, then ask a question."}
+            <p>{documents.length === 0
+              ? "Upload PDFs first, then come back to chat."
+              : "Select a document or search all, then ask a question."}
             </p>
           </div>
         )}
@@ -131,20 +178,8 @@ export default function PdfChat() {
                 ? <MarkdownContent content={m.content} />
                 : m.content}
             </div>
-            {m.role === "assistant" && m.sources?.length > 0 && (
-              <div className="sources-list">
-                {m.sources.map((s, si) => (
-                  <div key={si} className="source-chip">
-                    <span className="source-chip-score">
-                      {s.score ? `${Math.round(s.score * 100)}%` : "src"}
-                    </span>
-                    <span className="truncate" style={{ maxWidth: 300 }}>
-                      {s.filename || s.source || s.doc_id || `Source ${si + 1}`}
-                    </span>
-                    {s.page && <span style={{ color: "var(--text-disabled)" }}>p.{s.page}</span>}
-                  </div>
-                ))}
-              </div>
+            {m.role === "assistant" && (
+              <SourcesDropdown sources={m.sources} />
             )}
             <div className="message-meta">{m.role === "user" ? "You" : "Assistant"}</div>
           </div>
@@ -155,10 +190,7 @@ export default function PdfChat() {
             <div className="message-bubble"><LoadingDots /></div>
           </div>
         )}
-
         {error && <div className="error-banner">{error}</div>}
-
-        {/* Scroll anchor */}
         <div ref={bottomRef} />
       </div>
 
@@ -169,17 +201,10 @@ export default function PdfChat() {
           placeholder={documents.length === 0 ? "Upload PDFs first…" : `Ask a question about ${selectedLabel}…`}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-          }}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
           rows={1}
         />
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={send}
-          disabled={loading || !input.trim()}
-        >
+        <button type="button" className="btn btn-primary" onClick={send} disabled={loading || !input.trim()}>
           {loading ? <span className="spinner" /> : "Send"}
         </button>
       </div>

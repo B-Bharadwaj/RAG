@@ -1,9 +1,9 @@
 """
-streamlit_app.py — AI Business Report Analyzer v2
+streamlit_app.py - AI Business Report Analyzer v2
 ===================================================
 Mode switcher at the top:
-    📄 PDF Mode  — full v1 RAG pipeline (Chat, Upload, Manage, Compare, Eval)
-    📊 Data Mode — v2 business pipeline (Upload, Chat, Visualize, Report)
+     PDF Mode  - full v1 RAG pipeline (Chat, Upload, Manage, Compare, Eval)
+     Data Mode - v2 business pipeline (Upload, Chat, Visualize, Report)
 
 """
 
@@ -20,7 +20,7 @@ from collections import defaultdict
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-# ── v1 imports ─────────────────────────────────────────────────────────────
+# -- v1 imports -------------------------------------------------------------
 from pipeline.loader  import load_pdf, extract_images
 from pipeline.ocr     import caption_images
 from pipeline.indexer import add_to_index, get_index, load_state, remove_from_index
@@ -39,7 +39,7 @@ from generation.generator import (
 )
 from config import MAX_REQUESTS_PER_MINUTE
 
-# ── v2 imports ─────────────────────────────────────────────────────────────
+# -- v2 imports -------------------------------------------------------------
 from services.analyzer        import (
     process_uploaded_file, answer_question,
     get_executive_summary, get_anomaly_explanation,
@@ -50,7 +50,7 @@ from services.report_generator import generate_report
 
 import styles
 
-# ── Logger ─────────────────────────────────────────────────────────────────
+# -- Logger -----------------------------------------------------------------
 try:
     from logger import get_logger
     log = get_logger(__name__)
@@ -67,10 +67,10 @@ MAX_PAGE_COUNT   = 100
 
 load_state()
 
-# ── Page config ────────────────────────────────────────────────────────────
+# -- Page config ------------------------------------------------------------
 st.set_page_config(
     page_title="RAG v2",
-    page_icon="📊",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -85,7 +85,7 @@ section[data-testid="stSidebar"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Session state ──────────────────────────────────────────────────────────
+# -- Session state ----------------------------------------------------------
 defaults = {
     "mode":                "pdf",
     "pdf_chat_history":    [],
@@ -129,9 +129,9 @@ def _check_rate_limit() -> bool:
 
 def _first_author(s: str) -> str:
     if not s or s == "Unknown":
-        return "—"
+        return "-"
     first = re.split(r",|\band\b", s, maxsplit=1)[0].strip()
-    return first[:30] if first else "—"
+    return first[:30] if first else "-"
 
 
 def _find_image(sources: list):
@@ -155,13 +155,13 @@ def _score_badge(val) -> str:
 
 
 def _severity_emoji(s: str) -> str:
-    return {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(s, "⚪")
+    return {"high": " ", "medium": " ", "low": " "}.get(s, " ")
 
 
 def _validate_pdf(path: str, name: str) -> int:
     size_mb = os.path.getsize(path) / (1024 * 1024)
     if size_mb > MAX_FILE_SIZE_MB:
-        raise ValueError(f"'{name}' is {size_mb:.1f} MB — exceeds {MAX_FILE_SIZE_MB} MB.")
+        raise ValueError(f"'{name}' is {size_mb:.1f} MB - exceeds {MAX_FILE_SIZE_MB} MB.")
     try:
         n = len(PdfReader(path).pages)
     except PdfReadError as e:
@@ -169,7 +169,7 @@ def _validate_pdf(path: str, name: str) -> int:
     if n == 0:
         raise ValueError(f"'{name}' has no pages.")
     if n > MAX_PAGE_COUNT:
-        raise ValueError(f"'{name}' has {n} pages — exceeds {MAX_PAGE_COUNT}.")
+        raise ValueError(f"'{name}' has {n} pages - exceeds {MAX_PAGE_COUNT}.")
     return n
 
 
@@ -205,9 +205,9 @@ def _data_active_banner() -> bool:
     if not st.session_state.active_file_id:
         st.markdown("""
         <div class="empty-box">
-            <div class="empty-icon">📁</div>
+            <div class="empty-icon"> </div>
             <div class="empty-title">No file loaded</div>
-            <div class="empty-sub">Upload a file in the 📁 Upload tab first</div>
+            <div class="empty-sub">Upload a file in the   Upload tab first</div>
         </div>""", unsafe_allow_html=True)
         return False
     ftype  = st.session_state.active_file_type or ""
@@ -273,27 +273,27 @@ top_left, top_right = st.columns([3, 1])
 with top_left:
     st.markdown(
         "<p style='font-size:1.1rem;font-weight:700;color:#ffffff;margin:0;'>"
-        "📊 AI Business Report Analyzer — v2</p>"
+        " AI Business Report Analyzer - v2</p>"
         "<p style='font-size:0.75rem;color:#6b7280;margin:2px 0 0;'>"
-        "PDF · Excel · CSV — upload anything, ask anything</p>",
+        "PDF   Excel   CSV - upload anything, ask anything</p>",
         unsafe_allow_html=True,
     )
 with top_right:
     st.markdown(
         f"<p style='font-size:0.78rem;color:#6b7280;text-align:right;margin:0;'>"
-        f"{n_pdfs} PDF{'s' if n_pdfs != 1 else ''} · "
+        f"{n_pdfs} PDF{'s' if n_pdfs != 1 else ''}   "
         f"{n_biz} data file{'s' if n_biz != 1 else ''}</p>",
         unsafe_allow_html=True,
     )
 
 st.markdown("<hr style='margin:10px 0 8px;border-color:#1f1f1f;'>", unsafe_allow_html=True)
 
-# ── Mode switcher ──────────────────────────────────────────────────────────
+# -- Mode switcher ----------------------------------------------------------
 st.markdown("<p class='muted' style='margin-bottom:6px;'>Select mode</p>", unsafe_allow_html=True)
 mode_col1, mode_col2, _ = st.columns([1, 1, 5])
 with mode_col1:
     if st.button(
-        "📄 PDF Mode",
+        " PDF Mode",
         use_container_width=True,
         type="primary" if st.session_state.mode == "pdf" else "secondary",
     ):
@@ -301,7 +301,7 @@ with mode_col1:
         st.rerun()
 with mode_col2:
     if st.button(
-        "📊 Data Mode",
+        " Data Mode",
         use_container_width=True,
         type="primary" if st.session_state.mode == "data" else "secondary",
     ):
@@ -318,10 +318,10 @@ st.markdown("<hr style='margin:8px 0 4px;border-color:#1f1f1f;'>", unsafe_allow_
 if st.session_state.mode == "pdf":
 
     tab_chat, tab_upload, tab_manage, tab_compare, tab_eval = st.tabs([
-        "💬 Chat", "📤 Upload", "🗂️ Manage", "🔀 Compare", "📊 Eval",
+        "  Chat", "  Upload", "   Manage", "  Compare", " Eval",
     ])
 
-    # ── CHAT ──────────────────────────────────────────────────────────────────
+    # -- CHAT ------------------------------------------------------------------
     with tab_chat:
         ctrl_left, ctrl_mid, ctrl_right = st.columns([3, 1, 1])
         with ctrl_left:
@@ -358,7 +358,7 @@ if st.session_state.mode == "pdf":
         if not history:
             st.markdown("""
             <div class="empty-box">
-                <div class="empty-icon">💬</div>
+                <div class="empty-icon"> </div>
                 <div class="empty-title">Ask a question about your research papers</div>
                 <div class="empty-sub">Upload PDFs in the Upload tab first</div>
             </div>""", unsafe_allow_html=True)
@@ -369,15 +369,15 @@ if st.session_state.mode == "pdf":
                     sources = []
                 else:
                     q, a, sources, img_path, img_label = turn
-                with st.chat_message("user", avatar="🧑"):
+                with st.chat_message("user", avatar=" "):
                     st.markdown(q)
-                with st.chat_message("assistant", avatar="🤖"):
+                with st.chat_message("assistant", avatar=" "):
                     st.markdown(a)
                     if sources:
-                        with st.expander(f"📚 Sources ({len(sources)})", expanded=False):
+                        with st.expander(f"  Sources ({len(sources)})", expanded=False):
                             for i, s in enumerate(sources, 1):
                                 meta    = s.get("metadata", {})
-                                icon    = "🖼️" if s.get("type") == "image" else "📄"
+                                icon    = "  " if s.get("type") == "image" else ""
                                 preview = s["text"][:150].replace("\n", " ").strip()
                                 st.markdown(
                                     f"**[{i}]** {icon} `{meta.get('pdf','?')}`"
@@ -420,7 +420,7 @@ if st.session_state.mode == "pdf":
                     except Exception as e:
                         st.error(f"Something went wrong: {e}")
 
-    # ── UPLOAD ────────────────────────────────────────────────────────────────
+    # -- UPLOAD ----------------------------------------------------------------
     with tab_upload:
         st.markdown("<p class='sec-title'>Upload Research Papers</p>", unsafe_allow_html=True)
         st.markdown(
@@ -468,7 +468,7 @@ if st.session_state.mode == "pdf":
 
                 doc_id = generate_doc_id()
                 try:
-                    _log(f"TEXT  Extracting text — {name}")
+                    _log(f"TEXT  Extracting text - {name}")
                     pages_text = load_pdf(tmp_path)
                     chunks     = chunk_text_with_pages(pages_text)
                     text_docs  = create_documents(chunks, name, doc_id)
@@ -488,9 +488,9 @@ if st.session_state.mode == "pdf":
                     summary = generate_paper_summary(doc_id, name)
                     if summary:
                         update_document_summary(doc_id, summary)
-                    _log(f"DONE  '{meta.get('title', name)}' — {len(all_docs)} chunks")
+                    _log(f"DONE  '{meta.get('title', name)}' - {len(all_docs)} chunks")
                 except Exception as e:
-                    _log(f"ERR   {name} — {e}")
+                    _log(f"ERR   {name} - {e}")
                 finally:
                     os.unlink(tmp_path)
 
@@ -500,7 +500,7 @@ if st.session_state.mode == "pdf":
             st.success("Done! Switch to the Chat tab to start asking questions.")
             st.rerun()
 
-    # ── MANAGE ────────────────────────────────────────────────────────────────
+    # -- MANAGE ----------------------------------------------------------------
     with tab_manage:
         st.markdown("<p class='sec-title'>Indexed Documents</p>", unsafe_allow_html=True)
         manage_docs = get_all_documents()
@@ -508,7 +508,7 @@ if st.session_state.mode == "pdf":
         if not manage_docs:
             st.markdown("""
             <div class="empty-box">
-                <div class="empty-icon">📂</div>
+                <div class="empty-icon"> </div>
                 <div class="empty-title">No PDFs indexed yet</div>
                 <div class="empty-sub">Go to the Upload tab to add research papers</div>
             </div>""", unsafe_allow_html=True)
@@ -568,7 +568,7 @@ if st.session_state.mode == "pdf":
                 rc[2].markdown(f"<p style='font-size:0.83rem;color:#9ca3af;margin:0;'>{pages}</p>", unsafe_allow_html=True)
                 rc[3].markdown(f"<p style='font-size:0.83rem;color:#9ca3af;margin:0;'>{chunks}</p>", unsafe_allow_html=True)
                 rc[4].markdown(f"<p style='font-size:0.83rem;color:#6b7280;margin:0;'>{uploaded}</p>", unsafe_allow_html=True)
-                if rc[5].button("🗑️", key=f"del_{doc_id}"):
+                if rc[5].button("  ", key=f"del_{doc_id}"):
                     delete_target = d
                 st.markdown("<hr style='margin:4px 0;border-color:#1a1a1a;'>", unsafe_allow_html=True)
 
@@ -607,7 +607,7 @@ if st.session_state.mode == "pdf":
                     st.markdown("**Auto-generated summary**")
                     st.markdown(summary)
 
-    # ── COMPARE ───────────────────────────────────────────────────────────────
+    # -- COMPARE ---------------------------------------------------------------
     with tab_compare:
         st.markdown("<p class='sec-title'>Compare Papers Side by Side</p>", unsafe_allow_html=True)
         st.markdown("<p class='muted'>Select 2 or 3 papers and ask a comparison question.</p>", unsafe_allow_html=True)
@@ -644,20 +644,20 @@ if st.session_state.mode == "pdf":
                 else:
                     with st.spinner("Comparing papers..."):
                         answer, sources = ask_comparison(compare_q, doc_ids)
-                    with st.chat_message("assistant", avatar="🤖"):
+                    with st.chat_message("assistant", avatar=" "):
                         st.markdown(answer)
                         if sources:
-                            with st.expander(f"📚 Sources ({len(sources)})"):
+                            with st.expander(f"  Sources ({len(sources)})"):
                                 for i, s in enumerate(sources, 1):
                                     meta    = s.get("metadata", {})
-                                    icon    = "🖼️" if s.get("type") == "image" else "📄"
+                                    icon    = "  " if s.get("type") == "image" else ""
                                     preview = s["text"][:150].replace("\n", " ").strip()
                                     st.markdown(
                                         f"**[{i}]** {icon} `{meta.get('pdf','?')}`"
                                         f" p.{meta.get('page','?')}\n\n> {preview}..."
                                     )
 
-    # ── EVAL ──────────────────────────────────────────────────────────────────
+    # -- EVAL ------------------------------------------------------------------
     with tab_eval:
         st.markdown("<p class='sec-title'>RAG Evaluation Dashboard</p>", unsafe_allow_html=True)
         st.markdown(
@@ -675,7 +675,7 @@ if st.session_state.mode == "pdf":
 
         if run_eval:
             from eval.run_eval import run_on_recent_queries
-            with st.spinner("Scoring — may take 1-2 min on free tier..."):
+            with st.spinner("Scoring - may take 1-2 min on free tier..."):
                 try:
                     results = run_on_recent_queries(n=n_to_score)
                     if not results:
@@ -685,7 +685,7 @@ if st.session_state.mode == "pdf":
                         failed = len(results) - len(scored)
                         msg    = f"Scored {len(scored)} queries."
                         if failed:
-                            msg += f" ({failed} failed — rate limit, try again.)"
+                            msg += f" ({failed} failed - rate limit, try again.)"
                         st.success(msg)
                         st.rerun()
                 except Exception as e:
@@ -734,7 +734,7 @@ if st.session_state.mode == "pdf":
         ]
         if not fails:
             st.markdown(
-                "<p class='muted' style='color:#4ade80;'>No failures — all scores above 0.5.</p>",
+                "<p class='muted' style='color:#4ade80;'>No failures - all scores above 0.5.</p>",
                 unsafe_allow_html=True,
             )
         else:
@@ -766,15 +766,15 @@ if st.session_state.mode == "pdf":
 else:
 
     tab_upload, tab_chat, tab_viz, tab_report = st.tabs([
-        "📁 Upload", "💬 Chat", "📈 Visualize", "📥 Report",
+        "  Upload", "  Chat", "  Visualize", "  Report",
     ])
 
-    # ── UPLOAD ────────────────────────────────────────────────────────────────
+    # -- UPLOAD ----------------------------------------------------------------
     with tab_upload:
         st.markdown("<p class='sec-title'>Upload Business File</p>", unsafe_allow_html=True)
         st.markdown(
             "<p class='muted'>Supports Excel (.xlsx) and CSV (.csv). "
-            "Data is processed locally — only statistical summaries are sent to the AI.</p>",
+            "Data is processed locally - only statistical summaries are sent to the AI.</p>",
             unsafe_allow_html=True,
         )
 
@@ -808,16 +808,16 @@ else:
 
                 prog.progress(80, text="Generating AI insights...")
                 if result["status"] == "already_exists":
-                    _log_data("SKIP  Already processed — loaded from cache")
+                    _log_data("SKIP  Already processed - loaded from cache")
                 else:
-                    _log_data(f"SHPE  {result['shape'][0]:,} rows × {result['shape'][1]} cols")
+                    _log_data(f"SHPE  {result['shape'][0]:,} rows   {result['shape'][1]} cols")
                     _log_data(f"ANOM  {len(result['anomalies'])} anomalies detected")
                     _log_data("AI    Insights generated")
 
                 _set_active(result["file_id"], result["file_name"], result["file_type"], result)
                 prog.progress(100, text="Done!")
                 _log_data("DONE  Ready!")
-                st.success(f"✅ '{uploaded_file.name}' processed — switch to Chat tab!")
+                st.success(f"  '{uploaded_file.name}' processed - switch to Chat tab!")
 
                 st.markdown(f"""
                 <div class="kpi-grid" style="margin-top:1.2rem;">
@@ -847,7 +847,7 @@ else:
         if not biz_files:
             st.markdown("""
             <div class="empty-box">
-                <div class="empty-icon">📂</div>
+                <div class="empty-icon"> </div>
                 <div class="empty-title">No files uploaded yet</div>
                 <div class="empty-sub">Upload an Excel or CSV file above</div>
             </div>""", unsafe_allow_html=True)
@@ -868,7 +868,7 @@ else:
                 rc[0].markdown(
                     f"<p style='font-size:0.85rem;color:{name_color};margin:0;"
                     f"font-weight:{'600' if is_active else '400'};'>"
-                    f"{'▶ ' if is_active else ''}{f['file_name']}</p>",
+                    f"{'  ' if is_active else ''}{f['file_name']}</p>",
                     unsafe_allow_html=True,
                 )
                 rc[1].markdown(
@@ -889,13 +889,13 @@ else:
                     if not get_cached_file(f["file_id"]):
                         restored = restore_file_from_disk(f["file_id"])
                         if not restored:
-                            st.warning("File not in memory — please re-upload.")
+                            st.warning("File not in memory - please re-upload.")
                     cached = get_cached_file(f["file_id"])
                     if cached:
                         _set_active(f["file_id"], f["file_name"], f["file_type"], cached["processed"])
-                        st.success(f"Loaded '{f['file_name']}' — switch to Chat tab!")
+                        st.success(f"Loaded '{f['file_name']}' - switch to Chat tab!")
                         st.rerun()
-                if rc[5].button("🗑️", key=f"del_data_{f['file_id']}"):
+                if rc[5].button("  ", key=f"del_data_{f['file_id']}"):
                     delete_business_file(f["file_id"])
                     if st.session_state.active_file_id == f["file_id"]:
                         for k in ["active_file_id", "active_file_name", "active_file_type", "active_processed"]:
@@ -903,7 +903,7 @@ else:
                     st.rerun()
                 st.markdown("<hr style='margin:4px 0;border-color:#1a1a1a;'>", unsafe_allow_html=True)
 
-    # ── CHAT ──────────────────────────────────────────────────────────────────
+    # -- CHAT ------------------------------------------------------------------
     with tab_chat:
         st.markdown("<p class='sec-title'>Chat with Your Data</p>", unsafe_allow_html=True)
 
@@ -931,7 +931,7 @@ else:
         if not data_history:
             st.markdown(f"""
             <div class="empty-box">
-                <div class="empty-icon">💬</div>
+                <div class="empty-icon"> </div>
                 <div class="empty-title">Ask anything about {st.session_state.active_file_name}</div>
                 <div class="empty-sub">Charts auto-generate for visual questions</div>
             </div>""", unsafe_allow_html=True)
@@ -943,9 +943,9 @@ else:
                 else:
                     q, a, follow_ups, chart_result = turn
 
-                with st.chat_message("user", avatar="🧑"):
+                with st.chat_message("user", avatar=" "):
                     st.markdown(q)
-                with st.chat_message("assistant", avatar="🤖"):
+                with st.chat_message("assistant", avatar=" "):
                     st.markdown(a)
                     if chart_result and chart_result.get("fig"):
                         st.plotly_chart(
@@ -999,7 +999,7 @@ else:
                     except Exception as e:
                         st.error(f"Something went wrong: {e}")
 
-    # ── VISUALIZE ─────────────────────────────────────────────────────────────
+    # -- VISUALIZE -------------------------------------------------------------
     with tab_viz:
         st.markdown("<p class='sec-title'>Visualize</p>", unsafe_allow_html=True)
 
@@ -1008,7 +1008,7 @@ else:
 
         cached = get_cached_file(st.session_state.active_file_id)
         if not cached:
-            st.warning("File not in memory — please re-upload.")
+            st.warning("File not in memory - please re-upload.")
             st.stop()
 
         file_data  = cached["file_data"]
@@ -1019,7 +1019,7 @@ else:
         processed  = st.session_state.active_processed
 
         st.markdown(
-            "<p class='sec-title' style='font-size:0.95rem;'>📊 Chart Builder</p>",
+            "<p class='sec-title' style='font-size:0.95rem;'> Chart Builder</p>",
             unsafe_allow_html=True,
         )
         c1, c2, c3 = st.columns(3)
@@ -1028,11 +1028,11 @@ else:
                 "Chart Type",
                 ["bar", "line", "pie", "hist", "scatter"],
                 format_func=lambda x: {
-                    "bar":     "📊 Bar — compare categories",
-                    "line":    "📈 Line — show trends",
-                    "pie":     "🥧 Pie — show distribution",
-                    "hist":    "📉 Histogram — numeric distribution",
-                    "scatter": "⚬ Scatter — two numeric columns",
+                    "bar":     " Bar - compare categories",
+                    "line":    "  Line - show trends",
+                    "pie":     "  Pie - show distribution",
+                    "hist":    "  Histogram - numeric distribution",
+                    "scatter": "  Scatter - two numeric columns",
                 }[x],
             )
         with c2:
@@ -1062,7 +1062,7 @@ else:
 
         st.markdown("---")
         st.markdown(
-            "<p class='sec-title' style='font-size:0.95rem;'>💡 AI Insights</p>",
+            "<p class='sec-title' style='font-size:0.95rem;'>  AI Insights</p>",
             unsafe_allow_html=True,
         )
         db_file  = get_business_file(st.session_state.active_file_id)
@@ -1070,17 +1070,17 @@ else:
         if insights:
             st.markdown(insights)
         else:
-            st.markdown("<p class='muted'>No insights yet — re-upload to generate.</p>", unsafe_allow_html=True)
+            st.markdown("<p class='muted'>No insights yet - re-upload to generate.</p>", unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown(
-            "<p class='sec-title' style='font-size:0.95rem;'>🔍 Anomalies</p>",
+            "<p class='sec-title' style='font-size:0.95rem;'>  Anomalies</p>",
             unsafe_allow_html=True,
         )
         anomalies = processed.get("anomalies", []) if processed else []
         if not anomalies:
             st.markdown(
-                "<p class='muted' style='color:#4ade80;'>✅ No anomalies detected.</p>",
+                "<p class='muted' style='color:#4ade80;'>  No anomalies detected.</p>",
                 unsafe_allow_html=True,
             )
         else:
@@ -1089,7 +1089,7 @@ else:
                     f"<div class='src-card'>"
                     f"{_severity_emoji(a['severity'])} "
                     f"<b>{a['type'].replace('_', ' ').title()}</b>"
-                    f" — <code>{a['column']}</code><br>"
+                    f" - <code>{a['column']}</code><br>"
                     f"<span style='color:#9ca3af;font-size:0.82rem;'>{a['detail']}</span>"
                     f"</div>",
                     unsafe_allow_html=True,
@@ -1106,7 +1106,7 @@ else:
                 st.markdown("---")
                 st.markdown(st.session_state.anomaly_explanation)
 
-    # ── REPORT ────────────────────────────────────────────────────────────────
+    # -- REPORT ----------------------------------------------------------------
     with tab_report:
         st.markdown("<p class='sec-title'>Report</p>", unsafe_allow_html=True)
 
@@ -1114,7 +1114,7 @@ else:
             st.stop()
 
         st.markdown(
-            "<p class='sec-title' style='font-size:0.95rem;'>📝 Executive Summary</p>",
+            "<p class='sec-title' style='font-size:0.95rem;'>  Executive Summary</p>",
             unsafe_allow_html=True,
         )
         st.markdown(
@@ -1136,11 +1136,11 @@ else:
 
         st.markdown("---")
         st.markdown(
-            "<p class='sec-title' style='font-size:0.95rem;'>📥 Download Full Report</p>",
+            "<p class='sec-title' style='font-size:0.95rem;'>  Download Full Report</p>",
             unsafe_allow_html=True,
         )
         st.markdown(
-            "<p class='muted'>Full markdown report — statistics, anomalies, insights, executive summary.</p>",
+            "<p class='muted'>Full markdown report - statistics, anomalies, insights, executive summary.</p>",
             unsafe_allow_html=True,
         )
 
@@ -1168,7 +1168,7 @@ else:
 
                     st.success("Report ready!")
                     st.download_button(
-                        label="📥 Download Report (.md)",
+                        label="  Download Report (.md)",
                         data=report_content,
                         file_name=f"report_{st.session_state.active_file_name}.md",
                         mime="text/markdown",

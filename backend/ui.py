@@ -1,10 +1,10 @@
 """
-ui.py — Multi-PDF RAG Assistant
+ui.py - Multi-PDF RAG Assistant
 
 Compatible with Gradio 3.x and 4.x.
 - No show_copy_button (added in newer Gradio)
 - No type="messages" (added in newer Gradio)
-- Chat history uses (user_msg, assistant_msg) tuples — works everywhere.
+- Chat history uses (user_msg, assistant_msg) tuples - works everywhere.
 
 Changes from original
 ---------------------
@@ -81,7 +81,7 @@ def _check_rate_limit(session_id: str) -> bool:
 def _validate_pdf(pdf_path: str, pdf_name: str) -> int:
     size_mb = os.path.getsize(pdf_path) / (1024 * 1024)
     if size_mb > MAX_FILE_SIZE_MB:
-        raise ValueError(f"'{pdf_name}' is {size_mb:.1f} MB — exceeds {MAX_FILE_SIZE_MB} MB limit.")
+        raise ValueError(f"'{pdf_name}' is {size_mb:.1f} MB - exceeds {MAX_FILE_SIZE_MB} MB limit.")
     try:
         reader = PdfReader(pdf_path)
         page_count = len(reader.pages)
@@ -90,7 +90,7 @@ def _validate_pdf(pdf_path: str, pdf_name: str) -> int:
     if page_count == 0:
         raise ValueError(f"'{pdf_name}' has no pages.")
     if page_count > MAX_PAGE_COUNT:
-        raise ValueError(f"'{pdf_name}' has {page_count} pages — exceeds {MAX_PAGE_COUNT} limit.")
+        raise ValueError(f"'{pdf_name}' has {page_count} pages - exceeds {MAX_PAGE_COUNT} limit.")
     return page_count
 
 
@@ -103,7 +103,7 @@ def _process_single_pdf(pdf_path, pdf_name, progress_fn=None):
         if progress_fn:
             progress_fn(frac, desc)
 
-    _prog(0.0, "Validating…")
+    _prog(0.0, "Validating ")
     yield f"Validating '{pdf_name}'..."
     try:
         page_count = _validate_pdf(pdf_path, pdf_name)
@@ -379,7 +379,7 @@ def _format_sources(sources: list) -> str:
         doc_type  = s.get("type", "text").upper()
         type_icon = "[IMG]" if doc_type == "IMAGE" else "[TXT]"
         preview   = s["text"][:80].replace("\n", " ").strip()
-        lines.append(f"[{i}] {type_icon} {pdf} p.{page} — {preview}...")
+        lines.append(f"[{i}] {type_icon} {pdf} p.{page} - {preview}...")
 
     inner = "\n".join(lines)
     return f"\n\n---\nSources:\n{inner}"
@@ -547,7 +547,7 @@ def build_ui():
             label="Search scope", interactive=True,
         )
 
-        # ── Chat tab ─────────────────────────────────────────────────────
+        # -- Chat tab -----------------------------------------------------
         # Version-safe Chatbot: detect what the installed Gradio supports
         # at runtime so this file works on any Gradio version without changes.
         with gr.Tab("Chat"):
@@ -569,7 +569,7 @@ def build_ui():
                 )
                 send_btn = gr.Button("Send", variant="primary", scale=1)
 
-            # Figure viewer — hidden until a source chunk has image_path on disk
+            # Figure viewer - hidden until a source chunk has image_path on disk
             source_image = gr.Image(
                 label="Referenced figure",
                 visible=False,
@@ -587,8 +587,8 @@ def build_ui():
                 inputs=chat_input,
             )
 
-            # ── chat handler ─────────────────────────────────────────────
-            # _use_messages captured above — True means dict format,
+            # -- chat handler ---------------------------------------------
+            # _use_messages captured above - True means dict format,
             # False means (user, assistant) tuple format.
             def handle_chat(query, history, scope_choice, request: gr.Request,
                             _msgs=_use_messages):
@@ -654,14 +654,14 @@ def build_ui():
                 outputs=[chatbot, source_image, chat_input],
             )
 
-        # ── Upload tab ───────────────────────────────────────────────────
+        # -- Upload tab ---------------------------------------------------
         with gr.Tab("Upload PDF"):
             gr.Markdown("Upload one or multiple PDFs at once.")
             pdf_input     = gr.File(label="Upload PDF(s)", file_types=[".pdf"], file_count="multiple")
             upload_status = gr.Textbox(label="Upload Status", interactive=False, lines=8)
             pdf_input.change(process_pdfs, inputs=pdf_input, outputs=[upload_status, scope_dropdown])
 
-        # ── Manage tab ───────────────────────────────────────────────────
+        # -- Manage tab ---------------------------------------------------
         with gr.Tab("Manage PDFs"):
             gr.Markdown("### Search Papers")
             with gr.Row():
@@ -737,7 +737,7 @@ def build_ui():
             else:
                 gr.Markdown("No papers indexed yet.")
 
-        # ── Compare tab ──────────────────────────────────────────────────
+        # -- Compare tab --------------------------------------------------
         with gr.Tab("Compare Papers"):
             gr.Markdown("### Compare Papers Side by Side")
             gr.Markdown("Select 2 or 3 papers and ask a comparison question.")
@@ -756,7 +756,7 @@ def build_ui():
                 outputs=[compare_answer, compare_sources],
             )
 
-        # ── Eval tab ─────────────────────────────────────────────────────
+        # -- Eval tab -----------------------------------------------------
         with gr.Tab("Eval"):
             gr.Markdown("## RAG Evaluation Dashboard")
             gr.Markdown(
@@ -813,7 +813,7 @@ def build_ui():
 
             clear_btn = gr.Button("Clear all eval scores", variant="stop")
 
-            # ── helpers ──────────────────────────────────────────────────
+            # -- helpers --------------------------------------------------
 
             def _scores_to_df(rows):
                 if not rows:
@@ -902,7 +902,7 @@ def build_ui():
                 clear_eval_scores()
                 return ("Cleared.", *_refresh_dashboard())
 
-            # ── wire up ──────────────────────────────────────────────────
+            # -- wire up --------------------------------------------------
 
             score_btn.click(
                 run_scoring,

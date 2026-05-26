@@ -1,3 +1,4 @@
+
 """
 models/schemas.py
 
@@ -9,7 +10,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 
-# ── Upload Response ────────────────────────────────────────────────────────
+# -- Upload Response --------------------------------------------------------
 
 class UploadResponse(BaseModel):
     """Returned after a successful file upload and processing."""
@@ -23,7 +24,7 @@ class UploadResponse(BaseModel):
     anomaly_count: int
 
 
-# ── Q&A Request / Response ─────────────────────────────────────────────────
+# -- Q&A Request / Response -------------------------------------------------
 
 class QuestionRequest(BaseModel):
     """Sent by the client to ask a question about a file."""
@@ -42,7 +43,7 @@ class QuestionResponse(BaseModel):
     chart:      dict | None   = None
 
 
-# ── Summary Request / Response ─────────────────────────────────────────────
+# -- Summary Request / Response ---------------------------------------------
 
 class SummaryRequest(BaseModel):
     """Request an executive summary for a file."""
@@ -55,28 +56,33 @@ class SummaryResponse(BaseModel):
     summary:  str
 
 
-# ── Chart Request / Response ───────────────────────────────────────────────
+# -- Chart Request / Response -----------------------------------------------
 
 class ChartRequest(BaseModel):
-    """Request a chart generation."""
-    file_id:    str
-    chart_type: str = Field(..., pattern="^(bar|line|pie|hist|scatter)$")
-    x_col:      str
-    y_col:      Optional[str] = None
-    title:      Optional[str] = ""
-    color_col:  Optional[str] = None
-    sheet_name: Optional[str] = None
+    file_id:       str
+    chart_type:    str = Field(..., pattern="^(bar|line|pie|hist|scatter)$")
+    x_col:         str
+    y_col:         Optional[str]       = None
+    title:         Optional[str]       = ""
+    color_col:     Optional[str]       = None
+    sheet_name:    Optional[str]       = None
+    aggregation:   str                 = "count"
+    filter_col:    Optional[str]       = None
+    filter_values: list[str]           = []
 
 
 class ChartResponse(BaseModel):
-    """Returned after chart generation."""
-    chart_id:  str
-    file_id:   str
-    title:     str
-    file_path: str
+    chart_id:   str
+    file_id:    str
+    title:      str
+    file_path:  str = ""
+    labels:     list = []
+    values:     list = []
+    datasets:   list = []
+    chart_type: Optional[str] = None
 
 
-# ── Anomaly Response ───────────────────────────────────────────────────────
+# -- Anomaly Response -------------------------------------------------------
 
 class AnomalyDetail(BaseModel):
     """Single anomaly detected in the dataset."""
@@ -93,7 +99,7 @@ class AnomalyResponse(BaseModel):
     explanation: str
 
 
-# ── File Info Response ─────────────────────────────────────────────────────
+# -- File Info Response -----------------------------------------------------
 
 class FileInfoResponse(BaseModel):
     """Info about a registered business file."""
@@ -107,7 +113,7 @@ class FileInfoResponse(BaseModel):
     summary:     str
 
 
-# ── Report Response ────────────────────────────────────────────────────────
+# -- Report Response --------------------------------------------------------
 
 class ReportResponse(BaseModel):
     """Returned after report generation."""
@@ -117,7 +123,7 @@ class ReportResponse(BaseModel):
     timestamp:  str
 
 
-# ── Health Check ───────────────────────────────────────────────────────────
+# -- Health Check -----------------------------------------------------------
 
 class HealthResponse(BaseModel):
     """Basic health check response."""

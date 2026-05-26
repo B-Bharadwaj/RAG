@@ -1,117 +1,111 @@
-import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer
-} from "recharts";
+import { useEffect, useRef } from "react";
+import Chart from "chart.js/auto";
 
-const COLORS = [
-  "#e0e0ff", "#60a5fa", "#4ade80", "#fb923c", "#f472b6",
-  "#a78bfa", "#34d399", "#fbbf24", "#818cf8"
-];
+export default function ChartRenderer({ chart, height = 300 }) {
+  const ref = useRef(null);
+  const instance = useRef(null);
 
-const TOOLTIP_STYLE = {
-  background: "var(--bg-elevated)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  fontSize: 12,
-  color: "var(--text-primary)",
-};
+  useEffect(() => {
+    if (!chart || !ref.current) return;
 
-export default function ChartRenderer({ chartData }) {
-  if (!chartData) return null;
+    if (instance.current) {
+      instance.current.destroy();
+      instance.current = null;
+    }
 
-  const {
-    chart_type,
-    data,
-    x_column,
-    y_column,
-    title,
-    labels,
-    values,
-  } = chartData;
+    const type = chart.chart_type === "hist" ? "bar" : (chart.chart_type || "bar");
 
-  const type = (chart_type || "bar").toLowerCase();
+    const datasets = chart.datasets?.length
+      ? chart.datasets
+      : [{
+        label: chart.title || "Value",
+        data: chart.values || [],
+        backgroundColor: "#454cc7",
+        borderColor: "#454cc7",
+        borderWidth: 2,
+        borderRadius: 4,
+      }];
 
-  // Normalize data
-  const normalized = (() => {
-    if (Array.isArray(data)) return data;
-    if (labels && values) return labels.map((l, i) => ({ name: l, value: values[i] }));
-    return [];
-  })();
+    const chartConfig = {
+      type,
+      data: { labels: chart.labels || [], datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: datasets.length > 1,
+            labels: { color: "#3a3a6a", font: { size: 12 } },
+          },
+          title: {
+            display: !!chart.title,
+            text: chart.title || "",
+            color: "#070811",
+            font: { size: 14, weight: "600" },
+            padding: { bottom: 16 },
+          },
+        },
+        scales: type !== "pie" && type !== "doughnut"
+          ? {
+            x: { ticks: { color: "#6b6b9a", font: { size: 11 } }, grid: { color: "#d4d4e8" } },
+            y: { beginAtZero: true, ticks: { color: "#6b6b9a", font: { size: 11 } }, grid: { color: "#d4d4e8" } },
+          }
+          : {},
+      },
+    };
 
-  if (!normalized.length) {
-    return (
-      <div className="chart-box">
-        <p className="text-muted text-sm" style={{ textAlign: "center", padding: 20 }}>
-          No chart data available
-        </p>
-      </div>
-    );
-  }
+    // Histogram: raw values, bars touching like a real histogram
+    if (chart.chart_type === "hist") {
+      const vals = chart.values || [];
 
-  const xKey = x_column || "name" || Object.keys(normalized[0])[0];
-  const yKey = y_column || "value" || Object.keys(normalized[0])[1];
+      // Bin the raw values into buckets
+      const min = Math.floor(Math.min(...vals));
+      const max = Math.ceil(Math.max(...vals));
+      const binCount = Math.min(10, max - min);
+      const binSize = (max - min) / binCount;
+
+      const bins = Array(binCount).fill(0);
+      vals.forEach((v) => {
+        const idx = Math.min(Math.floor((v - min) / binSize), binCount - 1);
+        bins[idx]++;
+      });
+
+      const binLabels = Array(binCount).fill(0).map((_, i) =>
+        `${(min + i * binSize).toFixed(0)}–${(min + (i + 1) * binSize).toFixed(0)}`
+      );
+
+      chartConfig.data.labels = binLabels;
+      chartConfig.data.datasets[0].data = bins;
+      chartConfig.data.datasets[0].barPercentage = 1.0;
+      chartConfig.data.datasets[0].categoryPercentage = 1.0;
+      chartConfig.data.datasets[0].borderRadius = 0;
+      chartConfig.options.scales.x = {
+        ...chartConfig.options.scales.x,
+        offset: false,
+      };
+    }
+
+    instance.current = new Chart(ref.current, chartConfig);
+
+    return () => {
+      if (instance.current) {
+        instance.current.destroy();
+        instance.current = null;
+      }
+    };
+  }, [chart]);
+
+  if (!chart) return null;
 
   return (
-    <div className="chart-box">
-      {title && (
-        <div style={{ fontWeight: 600, marginBottom: 16, fontSize: 14 }}>{title}</div>
-      )}
-      <ResponsiveContainer width="100%" height={300}>
-        {type === "bar" ? (
-          <BarChart data={normalized} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey={xKey} tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--bg-hover)" }} />
-            <Bar dataKey={yKey} fill="#e0e0ff" radius={[3, 3, 0, 0]} />
-          </BarChart>
-        ) : type === "line" ? (
-          <LineChart data={normalized} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey={xKey} tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} />
-            <Line type="monotone" dataKey={yKey} stroke="#e0e0ff" strokeWidth={2} dot={{ r: 3, fill: "#e0e0ff" }} />
-          </LineChart>
-        ) : type === "pie" ? (
-          <PieChart>
-            <Pie
-              data={normalized}
-              dataKey={yKey || "value"}
-              nameKey={xKey || "name"}
-              cx="50%"
-              cy="50%"
-              outerRadius={120}
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              labelLine={false}
-            >
-              {normalized.map((_, i) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip contentStyle={TOOLTIP_STYLE} />
-            <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-muted)" }} />
-          </PieChart>
-        ) : type === "scatter" ? (
-          <ScatterChart margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey={xKey} type="number" name={xKey} tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} />
-            <YAxis dataKey={yKey} type="number" name={yKey} tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ strokeDasharray: "3 3" }} />
-            <Scatter data={normalized} fill="#e0e0ff" />
-          </ScatterChart>
-        ) : (
-          // hist fallback → bar
-          <BarChart data={normalized} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey={xKey} tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--bg-hover)" }} />
-            <Bar dataKey={yKey} fill="#60a5fa" radius={[3, 3, 0, 0]} />
-          </BarChart>
-        )}
-      </ResponsiveContainer>
+    <div style={{
+      background: "var(--bg-surface)",
+      border: "1px solid var(--border)",
+      borderRadius: "var(--radius-lg)",
+      padding: 20,
+      marginTop: 12,
+    }}>
+      <canvas ref={ref} style={{ maxHeight: height, width: "100%" }} />
     </div>
   );
 }

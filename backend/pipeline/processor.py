@@ -4,9 +4,9 @@ pipeline/processor.py
 Lightweight file processor for the v3 pipeline.
 
 v3 changes:
-    - Statistical analysis removed — replaced by SQL queries on PostgreSQL
-    - IQR anomaly detection removed — replaced by SQL anomaly queries
-    - Context compression removed — schema extracted directly from PostgreSQL
+    - Statistical analysis removed - replaced by SQL queries on PostgreSQL
+    - IQR anomaly detection removed - replaced by SQL anomaly queries
+    - Context compression removed - schema extracted directly from PostgreSQL
     - Only keeps basic shape/type info needed for fallback and UI display
 """
 
@@ -30,16 +30,16 @@ def process_file(
     sheet_name: str = None,
 ) -> dict:
     """
-    Lightweight processing — extracts only basic metadata.
+    Lightweight processing - extracts only basic metadata.
     All heavy analysis (stats, anomalies, summaries) now done via SQL.
 
     Returns:
-        shape     → (rows, cols) tuple
-        columns   → list of column names
-        dtypes    → dict of column → dtype
-        summary   → empty dict (kept for backward compatibility)
-        anomalies → empty list (kept for backward compatibility)
-        context   → minimal context string for fallback LLM calls
+        shape     -> (rows, cols) tuple
+        columns   -> list of column names
+        dtypes    -> dict of column -> dtype
+        summary   -> empty dict (kept for backward compatibility)
+        anomalies -> empty list (kept for backward compatibility)
+        context   -> minimal context string for fallback LLM calls
     """
     sheet = sheet_name or file_data.sheet_names[0]
     df    = file_data.dataframes.get(sheet)
@@ -59,7 +59,7 @@ def process_file(
     columns    = list(df.columns)
     dtypes     = {col: str(df[col].dtype) for col in columns}
 
-    # Minimal context string — used only as fallback if PostgreSQL is down
+    # Minimal context string - used only as fallback if PostgreSQL is down
     col_summary = []
     for col in columns[:10]:   # cap at 10 columns
         dtype = str(df[col].dtype)
@@ -81,7 +81,7 @@ def process_file(
     )
 
     log.info(
-        "Processed file: %s — %d rows × %d cols",
+        "Processed file: %s - %d rows   %d cols",
         file_data.file_name, rows, cols,
     )
 
@@ -89,8 +89,8 @@ def process_file(
         "shape":     [rows, cols],
         "columns":   columns,
         "dtypes":    dtypes,
-        "summary":   {},       # empty — SQL handles this now
-        "anomalies": [],       # empty — SQL handles this now
+        "summary":   {},       # empty - SQL handles this now
+        "anomalies": [],       # empty - SQL handles this now
         "context":   context,  # minimal fallback only
     }
 
