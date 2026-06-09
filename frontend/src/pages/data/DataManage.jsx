@@ -84,7 +84,7 @@ export default function DataManage({ onFileSelect }) {
             <p>Go to Upload to add CSV or Excel files.</p>
           </div>
         ) : (
-          <div className="table-wrap" style={{ overflowX: "auto" }}>
+          <div className="table-wrap">
             <table>
               <thead>
                 <tr>
@@ -104,7 +104,7 @@ export default function DataManage({ onFileSelect }) {
                   const typeColor = f.file_type === "csv" ? "badge-info" : "badge-success";
                   return (
                     <tr key={id} style={{ cursor: "pointer", background: isActive ? "var(--accent-glow)" : undefined }} onClick={() => setActive(id)}>
-                      <td style={{ maxWidth: 280 }}>
+                      <td style={{ width: 200, maxWidth: 200, overflow: "hidden" }}>
   <div style={{ fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.file_name}>
     {f.file_name}
   </div>

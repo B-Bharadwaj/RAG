@@ -107,7 +107,7 @@ export default function DataQueryLog({ activeFileId, onFileSelect }) {
             <p>Ask questions in Data Chat to generate SQL queries.</p>
           </div>
         ) : (
-          <div className="table-wrap" style={{ overflowX: "auto" }}>
+          <div className="table-wrap">
             <table>
               <thead>
                 <tr>
@@ -124,7 +124,7 @@ export default function DataQueryLog({ activeFileId, onFileSelect }) {
                   <>
                     <tr key={i}>
                       <td className="text-mono text-sm text-muted">{String(i + 1).padStart(2, "0")}</td>
-                      <td style={{ maxWidth: 240 }}>
+<td style={{ width: 200, maxWidth: 200, overflow: "hidden" }}>
   <div style={{ color: "var(--text-primary)", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={log.question || log.query}>
     {log.question || log.query || "—"}
   </div>

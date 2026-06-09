@@ -61,7 +61,7 @@ export default function PdfManage() {
             <p>Upload PDFs in the Upload tab to get started.</p>
           </div>
         ) : (
-          <div className="table-wrap" style={{ overflowX: "auto" }}>
+          <div className="table-wrap">
             <table>
               <thead>
                 <tr>
@@ -79,7 +79,7 @@ export default function PdfManage() {
                   const id = d.id || d.doc_id;
                   return (
                     <tr key={id}>
-                      <td style={{ maxWidth: 280 }}>
+                      <td style={{ width: 200, maxWidth: 200, overflow: "hidden" }}>
   <div style={{ fontWeight: 500, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.filename}>
     {d.filename || "—"}
   </div>
