@@ -3,7 +3,7 @@ import { pdfApi } from "../../api/client";
 
 function ScoreCell({ score }) {
   if (score == null) return <span style={{ color: "var(--text-disabled)" }}>—</span>;
-  const pct = score <= 1 ? score : score / 100;
+  const pct   = score <= 1 ? score : score / 100;
   const color = pct >= 0.7 ? "var(--success)" : pct >= 0.4 ? "var(--warning)" : "var(--danger)";
   return <span style={{ fontFamily: "var(--font-mono)", color, fontWeight: 600 }}>{pct.toFixed(4)}</span>;
 }
@@ -21,7 +21,7 @@ function FailureAccordion({ item, index }) {
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           {[["F", item.faithfulness], ["R", item.relevancy], ["C", item.context_recall]].map(([k, v]) =>
             v != null ? (
-              <span key={k} style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: v < 0.5 ? "var(--danger)" : "var(--success)" }}>
+              <span key={k} style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: v < 0.3 ? "var(--danger)" : "var(--success)" }}>
                 {k}:{v.toFixed(2)}
               </span>
             ) : null
@@ -31,8 +31,8 @@ function FailureAccordion({ item, index }) {
       {open && (
         <div style={{ padding: "14px 16px", borderTop: "1px solid var(--border)", background: "var(--bg-surface)" }}>
           {item.reasoning && <div style={{ marginBottom: 10 }}><div className="text-sm text-muted mb-8">Reasoning</div><p style={{ fontSize: 13, lineHeight: 1.7 }}>{item.reasoning}</p></div>}
-          {item.answer && <div style={{ marginBottom: 10 }}><div className="text-sm text-muted mb-8">Answer</div><p style={{ fontSize: 13, lineHeight: 1.7, color: "var(--text-secondary)" }}>{item.answer}</p></div>}
-          {item.scope && <div><div className="text-sm text-muted mb-8">Scope</div><span className="badge badge-neutral text-mono" style={{ fontSize: 11 }}>{item.scope}</span></div>}
+          {item.answer    && <div style={{ marginBottom: 10 }}><div className="text-sm text-muted mb-8">Answer</div><p style={{ fontSize: 13, lineHeight: 1.7, color: "var(--text-secondary)" }}>{item.answer}</p></div>}
+          {item.scope     && <div><div className="text-sm text-muted mb-8">Scope</div><span className="badge badge-neutral text-mono" style={{ fontSize: 11 }}>{item.scope}</span></div>}
         </div>
       )}
     </div>
@@ -40,21 +40,19 @@ function FailureAccordion({ item, index }) {
 }
 
 export default function PdfEval() {
-  const [scores, setScores] = useState([]);
+  const [scores,      setScores]      = useState([]);
   const [evalSummary, setEvalSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [scoring, setScoring] = useState(false);
-  const [scoreMsg, setScoreMsg] = useState("");
-  const [limit, setLimit] = useState(10);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState("");
+  const [scoring,     setScoring]     = useState(false);
+  const [scoreMsg,    setScoreMsg]    = useState("");
+  const [limit,       setLimit]       = useState(10);
 
-  // Always fetch independently on mount — no shared state dependency
   const load = async () => {
     setLoading(true);
     setError("");
     try {
       const res = await pdfApi.getEvalResults();
-      // Backend returns { summary: {...}, scores: [] }
       setScores(Array.isArray(res.data?.scores) ? res.data.scores : []);
       if (res.data?.summary) setEvalSummary(res.data.summary);
     } catch (e) {
@@ -81,23 +79,22 @@ export default function PdfEval() {
     }
   };
 
-  // No window.confirm
   const clearAll = async () => {
-    await pdfApi.clearEvalResults().catch(() => { });
+    await pdfApi.clearEvalResults().catch(() => {});
     setScores([]);
     setEvalSummary(null);
     setScoreMsg("");
   };
 
-  const avgFaith = evalSummary?.avg_faithfulness ?? null;
-  const avgRel = evalSummary?.avg_relevancy ?? null;
+  const avgFaith   = evalSummary?.avg_faithfulness  ?? null;
+  const avgRel     = evalSummary?.avg_relevancy      ?? null;
   const avgContext = evalSummary?.avg_context_recall ?? null;
-  const total = evalSummary?.total ?? scores.length;
+  const total      = evalSummary?.total              ?? scores.length;
 
   const failures = scores.filter((r) =>
-    (r.faithfulness != null && r.faithfulness < 0.5) ||
-    (r.relevancy != null && r.relevancy < 0.5) ||
-    (r.context_recall != null && r.context_recall < 0.5)
+    (r.faithfulness   != null && r.faithfulness   < 0.3) ||
+    (r.relevancy      != null && r.relevancy      < 0.3) ||
+    (r.context_recall != null && r.context_recall < 0.3)
   );
 
   return (
@@ -116,7 +113,7 @@ export default function PdfEval() {
           </div>
         </div>
 
-        {error && <div className="error-banner mb-16">{error}</div>}
+        {error    && <div className="error-banner mb-16">{error}</div>}
         {scoreMsg && <div className="success-banner mb-16">{scoreMsg}</div>}
 
         {/* Score Now */}
@@ -141,10 +138,10 @@ export default function PdfEval() {
         <div className="section-title mt-16">KPIs</div>
         <div className="kpi-grid mb-24">
           {[
-            { label: "Avg Faithfulness", value: avgFaith != null ? avgFaith.toFixed(4) : "—" },
-            { label: "Avg Relevancy", value: avgRel != null ? avgRel.toFixed(4) : "—" },
-            { label: "Avg Context Recall", value: avgContext != null ? avgContext.toFixed(4) : "—" },
-            { label: "Total Scored", value: total },
+            { label: "Avg Faithfulness",   value: avgFaith   != null ? avgFaith.toFixed(4)   : "—" },
+            { label: "Avg Relevancy",      value: avgRel     != null ? avgRel.toFixed(4)     : "—" },
+            { label: "Avg Context Recall", value: avgContext  != null ? avgContext.toFixed(4) : "—" },
+            { label: "Total Scored",       value: total },
           ].map((k) => (
             <div key={k.label} className="kpi-card">
               <div className="kpi-label">{k.label}</div>
@@ -170,11 +167,11 @@ export default function PdfEval() {
               <thead>
                 <tr>
                   <th style={{ width: "18%", minWidth: 120 }}>Query</th>
-                  <th style={{ width: "9%", minWidth: 90 }}>Faithfulness</th>
-                  <th style={{ width: "9%", minWidth: 80 }}>Relevancy</th>
-                  <th style={{ width: "9%", minWidth: 90, whiteSpace: "nowrap" }}>Context Recall</th>
+                  <th style={{ width: "9%",  minWidth: 90  }}>Faithfulness</th>
+                  <th style={{ width: "9%",  minWidth: 80  }}>Relevancy</th>
+                  <th style={{ width: "9%",  minWidth: 90, whiteSpace: "nowrap" }}>Context Recall</th>
                   <th style={{ width: "32%", minWidth: 160 }}>Reasoning</th>
-                  <th style={{ width: "12%", minWidth: 80 }}>Scope</th>
+                  <th style={{ width: "12%", minWidth: 80  }}>Scope</th>
                   <th style={{ width: "11%", minWidth: 90, whiteSpace: "nowrap" }}>Scored At</th>
                 </tr>
               </thead>
@@ -207,9 +204,9 @@ export default function PdfEval() {
             <div className="divider" />
             <div style={{ marginTop: 20 }}>
               <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6 }}>Failure analysis</div>
-              <p style={{ fontSize: 13, marginBottom: 14 }}>Responses where any score is below 0.5.</p>
+              <p style={{ fontSize: 13, marginBottom: 14 }}>Responses where any score is below 0.3.</p>
               {failures.length === 0
-                ? <div className="success-banner">No failures — all scores are above 0.5.</div>
+                ? <div className="success-banner">No failures — all scores are above 0.3.</div>
                 : failures.map((item, i) => <FailureAccordion key={i} item={item} index={i} />)
               }
             </div>

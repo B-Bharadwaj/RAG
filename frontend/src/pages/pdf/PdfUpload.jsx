@@ -52,7 +52,7 @@ export default function PdfUpload() {
           <div className="card mt-16">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <div style={{ fontWeight: 600, marginBottom: 3 }}>{file.name}</div>
+                <div style={{ fontWeight: 600, marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "calc(100% - 160px)" }}>{file.name}</div>
                 <div className="text-sm text-muted">
                   {(file.size / 1024 / 1024).toFixed(2)} MB
                 </div>
