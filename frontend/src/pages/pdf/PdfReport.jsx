@@ -30,9 +30,9 @@ function PaperCard({ doc }) {
             {doc.title || doc.filename}
           </div>
           <div className="text-sm text-muted">{doc.authors || "Unknown authors"}</div>
-          <div className="text-mono text-sm" style={{ color: "var(--text-disabled)", marginTop: 2 }}>
-            {doc.filename} &middot; {doc.page_count || "?"} pages &middot; {doc.chunk_count || "?"} chunks
-          </div>
+          <div className="text-mono text-sm" style={{ color: "var(--text-disabled)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={doc.filename}>
+  {doc.filename} · {doc.page_count || "?"} pages · {doc.chunk_count || "?"} chunks
+</div>
         </div>
         <button
           type="button"

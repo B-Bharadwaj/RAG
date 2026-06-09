@@ -79,10 +79,12 @@ export default function PdfManage() {
                   const id = d.id || d.doc_id;
                   return (
                     <tr key={id}>
-                      <td style={{ fontWeight: 500, color: "var(--text-primary)" }}>
-                        {d.filename || "—"}
-                        <div className="text-mono text-sm text-muted">{id}</div>
-                      </td>
+                      <td style={{ width: 200, maxWidth: 200, overflow: "hidden" }}>
+  <div style={{ fontWeight: 500, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.filename}>
+    {d.filename || "—"}
+  </div>
+  <div className="text-mono text-sm text-muted">{id}</div>
+</td>
                       <td style={{ maxWidth: 200 }}>
                         <div className="truncate text-sm">{d.title || d.filename || "—"}</div>
                         <div className="text-sm text-muted">{d.authors || ""}</div>

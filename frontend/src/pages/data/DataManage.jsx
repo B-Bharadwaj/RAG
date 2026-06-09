@@ -104,10 +104,12 @@ export default function DataManage({ onFileSelect }) {
                   const typeColor = f.file_type === "csv" ? "badge-info" : "badge-success";
                   return (
                     <tr key={id} style={{ cursor: "pointer", background: isActive ? "var(--accent-glow)" : undefined }} onClick={() => setActive(id)}>
-                      <td>
-                        <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{f.file_name}</div>
-                        <div className="text-mono text-sm text-muted">{id}</div>
-                      </td>
+                      <td style={{ width: 200, maxWidth: 200, overflow: "hidden" }}>
+  <div style={{ fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.file_name}>
+    {f.file_name}
+  </div>
+  <div className="text-mono text-sm text-muted">{id}</div>
+</td>
                       <td><span className={`badge ${typeColor}`}>{(f.file_type || "—").toUpperCase()}</span></td>
                       <td className="text-mono">{f.row_count?.toLocaleString() ?? "—"}</td>
                       <td className="text-mono">{f.col_count ?? "—"}</td>

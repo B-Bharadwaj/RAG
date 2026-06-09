@@ -57,6 +57,7 @@ export default function DataReport({ activeFileId, onFileSelect }) {
     setSummary("");
     setReport(null);
     setReportContent("");
+    setAnomalyText("");
     dataApi.getFile(fileId)
       .then(() => setFileValid(true))
       .catch(() => setFileValid(false));

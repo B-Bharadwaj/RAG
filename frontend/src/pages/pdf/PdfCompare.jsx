@@ -82,7 +82,9 @@ export default function PdfCompare({ compareHistory, setCompareHistory }) {
                         onClick={() => toggle(id)}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <div>
-                            <div style={{ fontWeight: 600, fontSize: 13 }}>{d.filename || d.title || "Document"}</div>
+                            <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300 }} title={d.filename || d.title}>
+  {d.filename || d.title || "Document"}
+</div>
                             <div className="text-sm text-muted text-mono">{id}</div>
                           </div>
                           {isSelected && <span className="badge badge-info">#{selected.indexOf(id) + 1}</span>}
