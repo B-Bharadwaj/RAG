@@ -13,6 +13,7 @@ export default function DataQueryLog({ activeFileId, onFileSelect }) {
 
   useEffect(() => { if (activeFileId) setFileId(activeFileId); }, [activeFileId]);
   useEffect(() => { load(); }, [fileOnly, fileId]);
+  useEffect(() => { load(); }, [fileOnly, fileId]);
 
   const load = async () => {
     setLoading(true);
@@ -106,7 +107,7 @@ export default function DataQueryLog({ activeFileId, onFileSelect }) {
             <p>Ask questions in Data Chat to generate SQL queries.</p>
           </div>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap" style={{ overflowX: "auto" }}>
             <table>
               <thead>
                 <tr>
@@ -123,10 +124,10 @@ export default function DataQueryLog({ activeFileId, onFileSelect }) {
                   <>
                     <tr key={i}>
                       <td className="text-mono text-sm text-muted">{String(i + 1).padStart(2, "0")}</td>
-                      <td style={{ maxWidth: 300 }}>
-                        <div style={{ color: "var(--text-primary)", fontSize: 13, lineHeight: 1.5 }}>
-                          {log.question || log.query || "—"}
-                        </div>
+                      <td style={{ maxWidth: 240 }}>
+  <div style={{ color: "var(--text-primary)", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={log.question || log.query}>
+    {log.question || log.query || "—"}
+  </div>
                         {!fileOnly && log.file_name && (
                           <div className="text-sm text-muted">{log.file_name}</div>
                         )}

@@ -57,7 +57,9 @@ export default function DataUpload({ onFileSelect }) {
           <div className="card mt-16">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <div style={{ fontWeight: 600, marginBottom: 3 }}>{file.name}</div>
+                <div style={{ fontWeight: 600, marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "calc(100% - 160px)" }} title={file.name}>
+  {file.name}
+</div>
                 <div className="text-sm text-muted">
                   {(file.size / 1024).toFixed(1)} KB &middot;{" "}
                   {file.name.endsWith(".csv") ? "CSV" : "Excel"}
