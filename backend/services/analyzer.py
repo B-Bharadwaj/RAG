@@ -88,6 +88,7 @@ def process_uploaded_file(
     file_bytes: bytes,
     file_name:  str,
     sheet_name: str = None,
+    user_id:    str = "",
 ) -> dict:
     """
     Full pipeline for an uploaded business file.
@@ -176,7 +177,7 @@ def process_uploaded_file(
         log.error("SQL-driven insights failed: %s", e)
 
     # -- Register in PostgreSQL ---------------------------------------------
-    if not business_file_exists(file_name):
+    if not business_file_exists(file_name, user_id):
         register_business_file(
             file_id     = file_id,
             file_name   = file_name,
@@ -184,6 +185,7 @@ def process_uploaded_file(
             sheet_names = file_data.sheet_names,
             row_count   = file_data.row_count,
             col_count   = file_data.col_count,
+            user_id     = user_id,
         )
 
     # Save insights as summary
@@ -260,6 +262,7 @@ def answer_question(
     file_id:    str,
     query:      str,
     sheet_name: str = None,
+    user_id:    str = "",
 ) -> dict:
     """
     Answer a question using Text-to-SQL on PostgreSQL.
@@ -342,12 +345,26 @@ def answer_question(
                     except Exception:
                         pass
 
+                    import json as _json
+                    chart_data_str = ""
+                    if chart_result:
+                        try:
+                            chart_data_str = _json.dumps({
+                                "chart_id":   chart_result.get("chart_id"),
+                                "title":      chart_result.get("title"),
+                                "chart_type": chart_result.get("chart_type"),
+                            })
+                        except Exception:
+                            pass
+
                     save_analysis(
                         file_id    = file_id,
                         file_name  = file_name,
                         query      = query,
                         answer     = answer,
                         sheet_name = sheet,
+                        chart_data = chart_data_str,
+                        user_id    = user_id,
                     )
 
                     return {
@@ -379,12 +396,26 @@ def answer_question(
         df        = df,
     )
 
+    import json as _json
+    chart_data_str = ""
+    if chart_result:
+        try:
+            chart_data_str = _json.dumps({
+                "chart_id":   chart_result.get("chart_id"),
+                "title":      chart_result.get("title"),
+                "chart_type": chart_result.get("chart_type"),
+            })
+        except Exception:
+            pass
+
     save_analysis(
         file_id    = file_id,
         file_name  = file_name,
         query      = query,
         answer     = answer,
         sheet_name = sheet,
+        chart_data = chart_data_str,
+        user_id    = user_id,
     )
 
     return {

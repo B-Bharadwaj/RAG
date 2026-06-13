@@ -2,22 +2,10 @@
 routers/analyzer.py
 
 All FastAPI endpoints for the Business Intelligence analyzer.
-
-Endpoints:
-    POST /upload          - upload and process a business file
-    POST /question        - ask a question about a file
-    GET  /summary/{file_id}   - get executive summary
-    GET  /anomalies/{file_id} - get anomaly explanation
-    POST /chart           - generate a chart
-    GET  /files           - list all uploaded files
-    GET  /files/{file_id} - get info about a specific file
-    DELETE /files/{file_id}   - delete a file
-    GET  /history/{file_id}   - get analysis history
-    GET  /health          - health check
 """
 
 import os
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
 from fastapi.responses import FileResponse
 from typing import Optional
 
@@ -29,6 +17,7 @@ from services.analyzer import (
     get_cached_file,
     restore_file_from_disk,
 )
+from middleware.auth_middleware import get_current_user
 from services.chart_generator import generate_chart, get_suggested_charts
 from services.report_generator import generate_report
 from services.sql_engine import (
@@ -60,11 +49,9 @@ def _extract_datasets(fig, chart_type: str) -> list:
         "#f59e0b", "#8b5cf6", "#10b981",
         "#ef4444", "#3b82f6",
     ]
-
     datasets = []
     for i, trace in enumerate(fig.data):
         color = COLORS[i % len(COLORS)]
-
         if chart_type == "pie":
             ds = {
                 "label":           getattr(trace, "name", "") or f"Series {i+1}",
@@ -84,37 +71,28 @@ def _extract_datasets(fig, chart_type: str) -> list:
             if chart_type == "line":
                 ds["fill"]    = False
                 ds["tension"] = 0.3
-
         datasets.append(ds)
-
     return datasets
+
 
 # -- Health Check -----------------------------------------------------------
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Basic health check - confirms the API is running."""
     return HealthResponse(status="ok", version="2.0")
 
-# -- column based chart -----------------------------------------------------------
+
+# -- Columns ----------------------------------------------------------------
 
 @router.get("/columns/{file_id}")
-async def get_column_values(file_id: str):
-    """
-    Get all columns with their unique values for the filter UI.
-
-    Returns:
-        categorical columns -> unique values if count <= 50
-        numeric columns     -> min and max only
-        high cardinality    -> count only, no values list
-    """
+async def get_column_values(
+    file_id: str,
+    current_user: dict = Depends(get_current_user),
+):
     cached = get_cached_file(file_id)
     if not cached:
         if not restore_file_from_disk(file_id):
-            raise HTTPException(
-                status_code = 404,
-                detail      = "File not found. Please re-upload."
-            )
+            raise HTTPException(status_code=404, detail="File not found. Please re-upload.")
         cached = get_cached_file(file_id)
 
     file_data  = cached["file_data"]
@@ -129,16 +107,15 @@ async def get_column_values(file_id: str):
 
         if is_numeric:
             columns.append({
-                "name":         col,
-                "type":         "numeric",
-                "unique_count": unique_count,
-                "min":          float(df[col].min()),
-                "max":          float(df[col].max()),
+                "name":          col,
+                "type":          "numeric",
+                "unique_count":  unique_count,
+                "min":           float(df[col].min()),
+                "max":           float(df[col].max()),
                 "unique_values": [],
             })
         elif unique_count <= 50:
-            unique_vals = df[col].dropna().unique().tolist()
-            unique_vals = sorted([str(v) for v in unique_vals])
+            unique_vals = sorted([str(v) for v in df[col].dropna().unique().tolist()])
             columns.append({
                 "name":          col,
                 "type":          "categorical",
@@ -163,48 +140,31 @@ async def get_column_values(file_id: str):
         "sheet_names": file_data.sheet_names,
         "columns":     columns,
     }
+
+
 # -- File Upload ------------------------------------------------------------
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_file(
-    file:       UploadFile = File(...),
-    sheet_name: Optional[str] = Form(None),
+    file:         UploadFile = File(...),
+    sheet_name:   Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user),
 ):
-    """
-    Upload and process a business file (Excel, CSV, or PDF).
-
-    - Saves file to disk
-    - Runs Pandas analysis
-    - Generates AI insights
-    - Loads into PostgreSQL for Text-to-SQL
-    - Registers in SQLite
-    """
-    # Validate file type
     allowed = {".csv", ".xlsx", ".xls", ".pdf"}
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in allowed:
-        raise HTTPException(
-            status_code = 400,
-            detail      = f"Unsupported file type '{ext}'. Allowed: {allowed}",
-        )
+        raise HTTPException(status_code=400, detail=f"Unsupported file type '{ext}'.")
 
-    # Read file bytes
     file_bytes = await file.read()
+    if len(file_bytes) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max size is 50MB.")
 
-    # Validate file size
-    max_bytes = 50 * 1024 * 1024   # 50 MB
-    if len(file_bytes) > max_bytes:
-        raise HTTPException(
-            status_code = 400,
-            detail      = f"File too large. Max size is 50MB.",
-        )
-
-    # Process
     try:
         result = process_uploaded_file(
             file_bytes = file_bytes,
             file_name  = file.filename,
             sheet_name = sheet_name,
+            user_id    = current_user["user_id"],
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing failed: {e}")
@@ -224,36 +184,33 @@ async def upload_file(
 # -- Question Answering -----------------------------------------------------
 
 @router.post("/question", response_model=QuestionResponse)
-async def ask_question(request: QuestionRequest):
-    """
-    Ask a natural language question about an uploaded file.
-    Uses Text-to-SQL on PostgreSQL for precise answers.
-    Falls back to stats-based answer if SQL fails.
-    """
+async def ask_question(
+    request:      QuestionRequest,
+    current_user: dict = Depends(get_current_user),
+):
     result = answer_question(
         file_id    = request.file_id,
         query      = request.query,
         sheet_name = request.sheet_name,
+        user_id    = current_user["user_id"],
     )
 
     if "File not found" in result["answer"]:
         raise HTTPException(status_code=404, detail="File not found. Please re-upload.")
 
-    # Convert Plotly figure to JSON if present
     chart_data = None
     chart = result.get("chart")
     if chart and chart.get("fig"):
         try:
-            fig = chart["fig"]
+            fig   = chart["fig"]
             trace = fig.data[0] if fig.data else None
-            ct = chart.get("chart_type")
+            ct    = chart.get("chart_type")
             if ct == "pie":
                 lbl = [str(v) for v in trace.labels] if trace and hasattr(trace, "labels") and trace.labels is not None else []
                 val = [float(v) for v in trace.values] if trace and hasattr(trace, "values") and trace.values is not None else []
             else:
                 lbl = [str(v) for v in trace.x] if trace and hasattr(trace, "x") and trace.x is not None else []
                 val = [float(v) for v in trace.y] if trace and hasattr(trace, "y") and trace.y is not None else []
-
             chart_data = {
                 "chart_id":   chart.get("chart_id"),
                 "title":      chart.get("title"),
@@ -264,6 +221,16 @@ async def ask_question(request: QuestionRequest):
             }
         except Exception:
             chart_data = None
+    
+    if chart_data:
+        try:
+            import json as _json
+            from services.sql_engine import update_analysis_chart_data, get_analysis_history
+            history = get_analysis_history(request.file_id, limit=1, offset=0, user_id=current_user["user_id"])
+            if history:
+                update_analysis_chart_data(history[0]["id"], _json.dumps(chart_data))
+        except Exception:
+            pass
 
     return QuestionResponse(
         file_id    = request.file_id,
@@ -278,21 +245,23 @@ async def ask_question(request: QuestionRequest):
 # -- Executive Summary ------------------------------------------------------
 
 @router.get("/summary/{file_id}", response_model=SummaryResponse)
-async def get_summary(file_id: str):
-    """Generate an executive summary for an uploaded file."""
+async def get_summary(
+    file_id:      str,
+    current_user: dict = Depends(get_current_user),
+):
     summary = get_executive_summary(file_id)
-
     if "File not found" in summary:
         raise HTTPException(status_code=404, detail="File not found. Please re-upload.")
-
     return SummaryResponse(file_id=file_id, summary=summary)
 
 
 # -- Anomaly Explanation ----------------------------------------------------
 
 @router.get("/anomalies/{file_id}", response_model=AnomalyResponse)
-async def get_anomalies(file_id: str):
-    """Get detected anomalies with AI explanation."""
+async def get_anomalies(
+    file_id:      str,
+    current_user: dict = Depends(get_current_user),
+):
     cached = get_cached_file(file_id)
     if not cached:
         if not restore_file_from_disk(file_id):
@@ -301,7 +270,6 @@ async def get_anomalies(file_id: str):
 
     anomalies   = cached["processed"].get("anomalies", [])
     explanation = get_anomaly_explanation(file_id)
-
     return AnomalyResponse(
         file_id     = file_id,
         anomalies   = [AnomalyDetail(**a) for a in anomalies],
@@ -312,31 +280,25 @@ async def get_anomalies(file_id: str):
 # -- Chart Generation -------------------------------------------------------
 
 @router.post("/chart", response_model=ChartResponse)
-async def create_chart(request: ChartRequest):
-    """
-    Generate a chart using SQL on PostgreSQL.
-    Supports column value filtering for precise charts.
-    """
+async def create_chart(
+    request:      ChartRequest,
+    current_user: dict = Depends(get_current_user),
+):
     cached = get_cached_file(request.file_id)
     if not cached:
         if not restore_file_from_disk(request.file_id):
-            raise HTTPException(
-                status_code = 404,
-                detail      = "File not found. Please re-upload."
-            )
+            raise HTTPException(status_code=404, detail="File not found. Please re-upload.")
         cached = get_cached_file(request.file_id)
 
     file_data  = cached["file_data"]
     sheet_name = request.sheet_name or file_data.sheet_names[0]
     table_map  = cached.get("table_map", {})
 
-    # -- SQL-based chart generation -----------------------------------------
     if table_map:
         from generation.generator import generate_manual_chart_sql
         from services.sql_engine  import execute_sql
 
         table_name = table_map.get(sheet_name) or list(table_map.values())[0]
-
         sql = generate_manual_chart_sql(
             table_name    = table_name,
             x_col         = request.x_col,
@@ -350,29 +312,17 @@ async def create_chart(request: ChartRequest):
         result = execute_sql(sql)
 
         if not result["success"] or not result["rows"]:
-            raise HTTPException(
-                status_code = 400,
-                detail      = f"SQL returned no results. Error: {result.get('error')}"
-            )
+            raise HTTPException(status_code=400, detail=f"SQL returned no results. Error: {result.get('error')}")
 
         import pandas as pd
         chart_df = pd.DataFrame(result["rows"], columns=result["columns"])
-
     else:
-        # Fallback - use DataFrame directly if no PostgreSQL table
         if sheet_name not in file_data.dataframes:
-            raise HTTPException(
-                status_code = 400,
-                detail      = f"Sheet '{sheet_name}' not found."
-            )
+            raise HTTPException(status_code=400, detail=f"Sheet '{sheet_name}' not found.")
         chart_df = file_data.dataframes[sheet_name]
 
-    # Validate columns
     if request.chart_type != "hist" and request.x_col not in chart_df.columns:
-        raise HTTPException(
-            status_code = 400,
-            detail      = f"Column '{request.x_col}' not found in result."
-        )
+        raise HTTPException(status_code=400, detail=f"Column '{request.x_col}' not found in result.")
 
     from services.chart_generator import generate_chart
     x_col_actual = chart_df.columns[0] if not chart_df.empty else request.x_col
@@ -394,7 +344,6 @@ async def create_chart(request: ChartRequest):
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
 
-    # Convert to Chart.js format
     labels   = []
     values   = []
     datasets = []
@@ -403,17 +352,9 @@ async def create_chart(request: ChartRequest):
         try:
             fig   = result["fig"]
             trace = fig.data[0] if fig.data else None
-
             if request.chart_type == "hist":
-                labels   = []
                 values   = [float(v) for v in chart_df.iloc[:, 0]] if not chart_df.empty else []
-                datasets = [{
-                    "label":           "Distribution",
-                    "data":            values,
-                    "backgroundColor": "#6366f1",
-                    "borderColor":     "#6366f1",
-                    "borderWidth":     1,
-                }]
+                datasets = [{"label": "Distribution", "data": values, "backgroundColor": "#6366f1", "borderColor": "#6366f1", "borderWidth": 1}]
             elif request.chart_type == "pie":
                 labels   = [str(v) for v in trace.labels] if trace and hasattr(trace, "labels") and trace.labels is not None else []
                 values   = [float(v) for v in trace.values] if trace and hasattr(trace, "values") and trace.values is not None else []
@@ -436,29 +377,23 @@ async def create_chart(request: ChartRequest):
         chart_type = request.chart_type,
     )
 
+
 # -- Report Generation ------------------------------------------------------
 
 @router.get("/report/{file_id}", response_model=ReportResponse)
-async def generate_file_report(file_id: str):
-    """Generate a downloadable markdown report for a file."""
+async def generate_file_report(
+    file_id:      str,
+    current_user: dict = Depends(get_current_user),
+):
     cached = get_cached_file(file_id)
     if not cached:
         if not restore_file_from_disk(file_id):
             raise HTTPException(status_code=404, detail="File not found. Please re-upload.")
         cached = get_cached_file(file_id)
 
-    processed = cached["processed"]
-    file_name = cached["file_data"].file_name
-
-    # Generate executive summary first
+    file_name    = cached["file_data"].file_name
     exec_summary = get_executive_summary(file_id)
-
-    # Get insights from DB
-    # from services.sql_engine import get_business_file as _get_bf
-    # db_file  = _get_bf(file_id)
-    # insights = db_file.get("summary", "") if db_file else ""
-
-    table_map = cached.get("table_map", {})
+    table_map    = cached.get("table_map", {})
 
     result = generate_report(
         file_name    = file_name,
@@ -479,26 +414,20 @@ async def generate_file_report(file_id: str):
 
 @router.get("/download/report/{report_id}")
 async def download_report(report_id: str):
-    """Download a generated report as a markdown file."""
     from config import REPORTS_DIR
     file_path = os.path.join(REPORTS_DIR, f"{report_id}_report.md")
-
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Report not found.")
-
-    return FileResponse(
-        path       = file_path,
-        filename   = f"report_{report_id}.md",
-        media_type = "text/markdown",
-    )
+    return FileResponse(path=file_path, filename=f"report_{report_id}.md", media_type="text/markdown")
 
 
 # -- File Management --------------------------------------------------------
 
 @router.get("/files", response_model=list[FileInfoResponse])
-async def list_files():
-    """List all uploaded business files."""
-    files = get_all_business_files()
+async def list_files(
+    current_user: dict = Depends(get_current_user),
+):
+    files = get_all_business_files(user_id=current_user["user_id"])
     return [
         FileInfoResponse(
             file_id     = f["file_id"],
@@ -515,12 +444,13 @@ async def list_files():
 
 
 @router.get("/files/{file_id}", response_model=FileInfoResponse)
-async def get_file_info(file_id: str):
-    """Get info about a specific uploaded file."""
+async def get_file_info(
+    file_id:      str,
+    current_user: dict = Depends(get_current_user),
+):
     f = get_business_file(file_id)
     if not f:
         raise HTTPException(status_code=404, detail="File not found.")
-
     return FileInfoResponse(
         file_id     = f["file_id"],
         file_name   = f["file_name"],
@@ -534,19 +464,16 @@ async def get_file_info(file_id: str):
 
 
 @router.delete("/files/{file_id}")
-async def delete_file(file_id: str):
-    """
-    Delete a file and all its associated data.
-    Also drops the PostgreSQL tables for this file.
-    """
+async def delete_file(
+    file_id:      str,
+    current_user: dict = Depends(get_current_user),
+):
     f = get_business_file(file_id)
     if not f:
         raise HTTPException(status_code=404, detail="File not found.")
 
-    # Drop PostgreSQL tables for this file
     try:
-        from services.analyzer import get_cached_file
-        cached = get_cached_file(file_id) or {}
+        cached    = get_cached_file(file_id) or {}
         table_map = cached.get("table_map", {})
         if table_map:
             from services.sql_engine import drop_file_tables
@@ -554,15 +481,12 @@ async def delete_file(file_id: str):
     except Exception as e:
         print(f"[WARN] Could not drop PostgreSQL tables: {e}")
 
-    # Delete from DB
     delete_business_file(file_id)
 
-    # Remove from memory cache
-    from services.analyzer import get_cached_file, _get_cache
+    from services.analyzer import _get_cache
     cache = _get_cache()
     cache.pop(file_id, None)
 
-    # Delete uploaded file from disk
     from config import UPLOADS_DIR
     for fname in os.listdir(UPLOADS_DIR):
         if fname.startswith(file_id):
@@ -574,9 +498,23 @@ async def delete_file(file_id: str):
     return {"status": "deleted", "file_id": file_id}
 
 
-# ──-- Analysis History ───────────────────────────────────────────────────────-------------------------------------------------------
+# -- Analysis History -------------------------------------------------------
 
 @router.get("/history/{file_id}")
-async def get_history(file_id: str, limit: int = 10, offset: int = 0):
-    history = get_analysis_history(file_id, limit=limit, offset=offset)
+async def get_history(
+    file_id:      str,
+    limit:        int = 10,
+    offset:       int = 0,
+    current_user: dict = Depends(get_current_user),
+):
+    import json as _json
+    history = get_analysis_history(file_id, limit=limit, offset=offset, user_id=current_user["user_id"])
+    for item in history:
+        if item.get("chart_data"):
+            try:
+                item["chart_data"] = _json.loads(item["chart_data"])
+            except Exception:
+                item["chart_data"] = None
+        else:
+            item["chart_data"] = None
     return {"file_id": file_id, "history": history}

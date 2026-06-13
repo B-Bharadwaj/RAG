@@ -272,9 +272,19 @@ def create_tables() -> None:
                 query       TEXT NOT NULL,
                 answer      TEXT NOT NULL,
                 sheet_name  TEXT DEFAULT '',
-                asked_at    TEXT NOT NULL
+                asked_at    TEXT NOT NULL,
+                chart_data  TEXT DEFAULT ''
             )
         """)
+
+        # Migration for existing tables
+        try:
+            cursor.execute("""
+                ALTER TABLE analysis_history 
+                ADD COLUMN IF NOT EXISTS chart_data TEXT DEFAULT ''
+            """)
+        except Exception:
+            pass
 
         # -- query_log ------------------------------------------------------
         cursor.execute("""
@@ -291,6 +301,29 @@ def create_tables() -> None:
                 asked_at    TEXT NOT NULL
             )
         """)
+
+        # -- users ------------------------------------------------------------------
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                user_id     TEXT PRIMARY KEY,
+                email       TEXT UNIQUE NOT NULL,
+                name        TEXT NOT NULL,
+                password    TEXT DEFAULT '',
+                auth_type   TEXT DEFAULT 'email',
+                avatar      TEXT DEFAULT '',
+                created_at  TEXT NOT NULL
+            )
+        """)
+
+        # -- Add user_id to existing tables ----------------------------------------
+        for table in ["business_files", "analysis_history", "query_log"]:
+            try:
+                cursor.execute(f"""
+                    ALTER TABLE {table}
+                    ADD COLUMN IF NOT EXISTS user_id TEXT DEFAULT ''
+                """)
+            except Exception:
+                pass
 
         conn.commit()
         print("[PostgreSQL] All Data Mode tables created/verified.")
@@ -311,6 +344,7 @@ def register_business_file(
     sheet_names: list,
     row_count:   int,
     col_count:   int,
+    user_id:     str = "",
 ) -> None:
     """Register an uploaded business file in PostgreSQL."""
     conn   = get_connection()
@@ -318,25 +352,20 @@ def register_business_file(
     try:
         cursor.execute("""
             INSERT INTO business_files
-              (file_id, file_name, file_type, sheet_names,
-               row_count, col_count, uploaded_at, summary)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            (file_id, file_name, file_type, sheet_names,
+            row_count, col_count, uploaded_at, summary, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (file_id) DO UPDATE SET
-              file_name   = EXCLUDED.file_name,
-              file_type   = EXCLUDED.file_type,
-              sheet_names = EXCLUDED.sheet_names,
-              row_count   = EXCLUDED.row_count,
-              col_count   = EXCLUDED.col_count,
-              uploaded_at = EXCLUDED.uploaded_at
+            file_name   = EXCLUDED.file_name,
+            file_type   = EXCLUDED.file_type,
+            sheet_names = EXCLUDED.sheet_names,
+            row_count   = EXCLUDED.row_count,
+            col_count   = EXCLUDED.col_count,
+            uploaded_at = EXCLUDED.uploaded_at
         """, (
-            file_id,
-            file_name,
-            file_type,
-            json.dumps(sheet_names),
-            row_count,
-            col_count,
-            datetime.now(timezone.utc).isoformat(),
-            "",
+            file_id, file_name, file_type,
+            json.dumps(sheet_names), row_count, col_count,
+            datetime.now(timezone.utc).isoformat(), "", user_id,
         ))
         conn.commit()
         print(f"[PostgreSQL] Registered file: {file_name}")
@@ -365,15 +394,22 @@ def get_business_file(file_id: str) -> dict | None:
         conn.close()
 
 
-def get_all_business_files() -> list[dict]:
+def get_all_business_files(user_id: str = "") -> list[dict]:
     """Get all uploaded business files newest first."""
     conn   = get_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
-        cursor.execute("""
-            SELECT * FROM business_files
-            ORDER BY uploaded_at DESC
-        """)
+        if user_id:
+            cursor.execute("""
+                SELECT * FROM business_files
+                WHERE user_id = %s
+                ORDER BY uploaded_at DESC
+            """, (user_id,))
+        else:
+            cursor.execute("""
+                SELECT * FROM business_files
+                ORDER BY uploaded_at DESC
+            """)
         rows = cursor.fetchall()
         result = []
         for row in rows:
@@ -427,6 +463,8 @@ def save_analysis(
     query:      str,
     answer:     str,
     sheet_name: str = "",
+    chart_data: str = "",
+    user_id:    str = "",
 ) -> None:
     """Save a Q&A entry to analysis history."""
     conn   = get_connection()
@@ -434,16 +472,13 @@ def save_analysis(
     try:
         cursor.execute("""
             INSERT INTO analysis_history
-              (file_id, file_name, query, answer, sheet_name, asked_at)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            (file_id, file_name, query, answer, sheet_name, asked_at, chart_data, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            file_id,
-            file_name,
-            query,
-            answer,
-            sheet_name,
-            datetime.now(timezone.utc).isoformat(),
+            file_id, file_name, query, answer, sheet_name,
+            datetime.now(timezone.utc).isoformat(), chart_data, user_id,
         ))
+
         conn.commit()
     finally:
         cursor.close()
@@ -453,18 +488,28 @@ def save_analysis(
 def get_analysis_history(
     file_id: str,
     limit:   int = 20,
-    offset: int=0
+    offset:  int = 0,
+    user_id: str = "",
 ) -> list[dict]:
     """Get Q&A history for a file newest first."""
     conn   = get_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
-        cursor.execute("""
-            SELECT * FROM analysis_history
-            WHERE file_id = %s
-            ORDER BY asked_at DESC
-            LIMIT %s OFFSET %s
-        """, (file_id, limit,offset))
+        if user_id:
+            cursor.execute("""
+                SELECT * FROM analysis_history
+                WHERE file_id = %s AND user_id = %s
+                ORDER BY asked_at DESC
+                LIMIT %s OFFSET %s
+            """, (file_id, user_id, limit, offset))
+        else:
+            cursor.execute("""
+                SELECT * FROM analysis_history
+                WHERE file_id = %s
+                ORDER BY asked_at DESC
+                LIMIT %s OFFSET %s
+            """, (file_id, limit, offset))
+
         return [dict(row) for row in cursor.fetchall()]
     finally:
         cursor.close()
@@ -579,15 +624,21 @@ def clear_query_logs_pg(file_id: str = None) -> None:
         cursor.close()
         conn.close()    
 
-def business_file_exists(file_name: str) -> bool:
-    """Check if a file with this name is already registered."""
+def business_file_exists(file_name: str, user_id: str = "") -> bool:
+    """Check if a file with this name is already registered for this user."""
     conn   = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute(
-            "SELECT 1 FROM business_files WHERE file_name = %s",
-            (file_name,)
-        )
+        if user_id:
+            cursor.execute(
+                "SELECT 1 FROM business_files WHERE file_name = %s AND user_id = %s",
+                (file_name, user_id)
+            )
+        else:
+            cursor.execute(
+                "SELECT 1 FROM business_files WHERE file_name = %s",
+                (file_name,)
+            )
         return cursor.fetchone() is not None
     finally:
         cursor.close()
@@ -622,6 +673,94 @@ def save_chart(
             chart_id, file_id, chart_type, title, file_path,
             datetime.now(timezone.utc).isoformat(),
         ))
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
+
+# =============================================================================
+# User Registry
+# =============================================================================
+
+def create_user(
+    email:     str,
+    name:      str,
+    password:  str = "",
+    auth_type: str = "email",
+    avatar:    str = "",
+) -> dict:
+    """Create a new user."""
+    import uuid
+    user_id  = str(uuid.uuid4())
+    conn     = get_connection()
+    cursor   = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO users (user_id, email, name, password, auth_type, avatar, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            user_id, email, name, password, auth_type, avatar,
+            datetime.now(timezone.utc).isoformat(),
+        ))
+        conn.commit()
+        return {
+            "user_id":   user_id,
+            "email":     email,
+            "name":      name,
+            "auth_type": auth_type,
+            "avatar":    avatar,
+        }
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_user_by_email(email: str) -> dict | None:
+    """Get user by email."""
+    conn   = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_user_by_id(user_id: str) -> dict | None:
+    """Get user by user_id."""
+    conn   = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def email_exists(email: str) -> bool:
+    """Check if email is already registered."""
+    conn   = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT 1 FROM users WHERE email = %s", (email,))
+        return cursor.fetchone() is not None
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_analysis_chart_data(record_id: int, chart_data: str) -> None:
+    """Update chart_data for an analysis history record."""
+    conn   = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE analysis_history SET chart_data = %s WHERE id = %s",
+            (chart_data, record_id)
+        )
         conn.commit()
     finally:
         cursor.close()

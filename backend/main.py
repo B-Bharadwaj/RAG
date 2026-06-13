@@ -23,6 +23,7 @@ from routers.analyzer import router as data_router
 from routers.rag      import router as rag_router
 from routers.sql      import router as sql_router
 from services.sql_engine import create_tables
+from routers.auth import router as auth_router
 # ── App ────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
@@ -71,7 +72,7 @@ async def startup():
 app.include_router(rag_router,  prefix="/api/v1", tags=["📄 PDF RAG Pipeline"])
 app.include_router(data_router, prefix="/api/v2", tags=["📊 Business Intelligence"])
 app.include_router(sql_router,  prefix="/api/v2", tags=["📋 Query Log"])
-
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 # ── Root ───────────────────────────────────────────────────────────────────
 
 @app.get("/")

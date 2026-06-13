@@ -10,7 +10,9 @@ const CHART_TYPES = ["bar", "line", "pie", "hist", "scatter"];
 const AGGREGATIONS = ["count", "sum", "average", "min", "max"];
 
 export default function DataVisualize({ activeFileId, onFileSelect }) {
-  const [fileId, setFileId] = useState(activeFileId || "");
+  const [fileId, setFileId] = useState(
+  activeFileId || localStorage.getItem("ragbot_active_file_id") || ""
+);
   const [fileInfo, setFileInfo] = useState(null);
   const [columns, setColumns] = useState([]);
   const [colsLoading, setColsLoading] = useState(false);

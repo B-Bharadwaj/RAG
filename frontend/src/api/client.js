@@ -1,13 +1,30 @@
 import axios from "axios";
 
 const http = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000",
+  baseURL: "",
   timeout: 120000,
 });
 
+// ── Request interceptor: attach JWT token ──────────────────────────────────
+http.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// ── Response interceptor: handle 401 ──────────────────────────────────────
 http.interceptors.response.use(
   (res) => res,
   (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("ragbot_active_file_id");
+      window.location.href = "/login";
+      return Promise.reject(new Error("Session expired. Please log in again."));
+    }
     const msg =
       err.response?.data?.detail ||
       err.response?.data?.message ||
@@ -16,6 +33,22 @@ http.interceptors.response.use(
     return Promise.reject(new Error(msg));
   }
 );
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+export const authApi = {
+  login: (email, password) =>
+    http.post("/api/auth/login", { email, password }),
+
+  register: (name, email, password) =>
+    http.post("/api/auth/register", { name, email, password }),
+
+  googleLogin: (token) =>
+    http.post("/api/auth/google", { token }),
+
+  me: () =>
+    http.get("/api/auth/me"),
+};
 
 // ─── PDF / RAG  (v1) ────────────────────────────────────────────────────────
 
@@ -115,7 +148,6 @@ export const dataApi = {
 
   deleteFile: (fileId) => http.delete(`/api/v2/files/${fileId}`),
 
-  // offset param added for paginated infinite scroll
   getHistory: (fileId, limit = 10, offset = 0) =>
     http.get(`/api/v2/history/${fileId}`, { params: { limit, offset } }),
 

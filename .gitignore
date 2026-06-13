@@ -83,3 +83,4 @@ eval/test_set.json
 *.pt
 *.pth
 *.ckpt
+backend/ragbot-backend/

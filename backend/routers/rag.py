@@ -40,6 +40,8 @@ from generation.generator import (
     ask_question, reset_memory,
     extract_pdf_metadata, ask_comparison,
 )
+from middleware.auth_middleware import get_current_user
+from fastapi import Depends
 
 router = APIRouter()
 
@@ -100,7 +102,7 @@ async def health():
 # -- Upload PDF -------------------------------------------------------------
 
 @router.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     """
     Upload and process a PDF through the full v1 RAG pipeline:
     text extraction -> chunking -> OCR -> FAISS + BM25 indexing
@@ -185,7 +187,7 @@ async def upload_pdf(file: UploadFile = File(...)):
 # -- Chat -------------------------------------------------------------------
 
 @router.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, current_user: dict = Depends(get_current_user)):
     """
     Ask a question about indexed PDFs.
     Set doc_id to scope to a specific PDF, or leave None for all PDFs.
@@ -229,7 +231,7 @@ async def chat(request: ChatRequest):
 # -- Compare ----------------------------------------------------------------
 
 @router.post("/compare")
-async def compare(request: CompareRequest):
+async def compare(request: CompareRequest, current_user: dict = Depends(get_current_user)):
     """
     Compare 2-3 papers side by side on a specific question.
     Provide doc_ids of the papers to compare.
@@ -269,7 +271,7 @@ async def compare(request: CompareRequest):
 # -- Document Management ----------------------------------------------------
 
 @router.get("/documents")
-async def list_documents():
+async def list_documents(current_user: dict = Depends(get_current_user)):
     """List all indexed PDF documents with metadata."""
     docs = get_all_documents()
     result = []
@@ -289,7 +291,7 @@ async def list_documents():
 
 
 @router.get("/documents/{doc_id}")
-async def get_document_info(doc_id: str):
+async def get_document_info(doc_id: str, current_user: dict = Depends(get_current_user)):
     """Get detailed info about a specific document including abstract and summary."""
     doc = get_document(doc_id)
     if not doc:
@@ -311,7 +313,7 @@ async def get_document_info(doc_id: str):
 # -- Summary -------------------------------------------------------------------
 
 @router.get("/documents/{doc_id}/summary")
-async def get_document_summary(doc_id: str):
+async def get_document_summary(doc_id: str, current_user: dict = Depends(get_current_user)):
     """
     Get summary for a PDF. Generates it on first request
     and caches in SQLite for subsequent requests.
@@ -342,7 +344,7 @@ async def get_document_summary(doc_id: str):
     }
 
 @router.delete("/documents/{doc_id}")
-async def delete_document_endpoint(doc_id: str):
+async def delete_document_endpoint(doc_id: str, current_user: dict = Depends(get_current_user)):
     """
     Delete a document from the index and database.
     Also removes saved figure images for this document.
@@ -382,14 +384,14 @@ async def delete_document_endpoint(doc_id: str):
 # -- Memory -----------------------------------------------------------------
 
 @router.delete("/memory")
-async def clear_memory():
+async def clear_memory(current_user: dict = Depends(get_current_user)):
     """Clear all conversation memory."""
     reset_memory()
     return {"status": "cleared", "message": "Conversation memory has been reset."}
 
 
 @router.get("/history")
-async def get_history(limit: int = 20):
+async def get_history(limit: int = 20, current_user: dict = Depends(get_current_user)):
     """Get recent chat history."""
     history = get_question_history(limit=limit)
     return {"total": len(history), "history": history}
@@ -402,7 +404,7 @@ async def get_history(limit: int = 20):
 #     return {"status": "ok", "message": "History cleared"}
 
 @router.delete("/history")
-async def clear_history():
+async def clear_history(current_user: dict = Depends(get_current_user)):
     """Clear all question history from SQLite."""
     from pipeline.db import clear_question_history
     clear_question_history()
@@ -411,7 +413,7 @@ async def clear_history():
 # -- Evaluation -------------------------------------------------------------
 
 @router.post("/eval/score")
-async def score_queries(request: EvalRequest):
+async def score_queries(request: EvalRequest, current_user: dict = Depends(get_current_user)):
     """
     Score the most recent N un-scored chat queries using the judge LLM.
     Uses llama-3.3-70b to score Faithfulness, Relevancy, and Context Recall.
@@ -442,7 +444,7 @@ async def score_queries(request: EvalRequest):
 
 
 @router.get("/eval/results")
-async def get_eval_results(limit: int = 50):
+async def get_eval_results(limit: int = 50, current_user: dict = Depends(get_current_user)):
     """Get evaluation scores and summary statistics."""
     summary = get_eval_summary()
     rows    = get_eval_scores(limit=limit)
@@ -454,7 +456,7 @@ async def get_eval_results(limit: int = 50):
 
 
 @router.delete("/eval/results")
-async def clear_eval():
+async def clear_eval(current_user: dict = Depends(get_current_user)):
     """Clear all evaluation scores."""
     clear_eval_scores()
     return {"status": "cleared", "message": "All eval scores have been deleted."}

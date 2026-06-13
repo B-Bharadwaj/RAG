@@ -11,7 +11,9 @@ const PAGE_SIZE    = 10;
 const formatHistory = (history) =>
   history.flatMap((h) => ([
     { role: "user",      content: h.query,  id: `u-${h.id || Math.random()}` },
-    { role: "assistant", content: h.answer, id: `a-${h.id || Math.random()}`, chart: h.chart || null, sql: h.sql || null, followUps: h.follow_ups || [] },
+    { role: "assistant", content: h.answer, id: `a-${h.id || Math.random()}`, chart: (h.chart_data?.datasets?.length || h.chart_data?.values?.length)
+  ? (h.chart_data || h.chart)
+  : null, sql: h.sql || null, followUps: h.follow_ups || [] },
   ]));
 
 export default function DataChat({ activeFileId, onFileSelect }) {
@@ -47,7 +49,7 @@ export default function DataChat({ activeFileId, onFileSelect }) {
   // Sync fileId from parent
   useEffect(() => {
     if (activeFileId) setFileId(activeFileId);
-  }, [activeFileId]);
+  }, [activeFileId, files]);
 
   // Initial load when activeFileId changes
   useEffect(() => {
@@ -197,7 +199,7 @@ export default function DataChat({ activeFileId, onFileSelect }) {
           <select
             className="select"
             style={{ width: "auto", minWidth: 220 }}
-            value={fileId}
+            value={activeFileId || fileId || ""}
             onChange={(e) => handleSelectFile(e.target.value)}
           >
             <option value="">Select a file…</option>
