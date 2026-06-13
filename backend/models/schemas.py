@@ -129,3 +129,16 @@ class HealthResponse(BaseModel):
     """Basic health check response."""
     status:  str
     version: str = "2.0"
+
+# -- Auth -------------------------------------------------------------------
+class UserResponse(BaseModel):
+    user_id:   str
+    email:     str
+    name:      str
+    auth_type: str
+    avatar:    str = ""
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type:   str = "bearer"
+    user:         UserResponse

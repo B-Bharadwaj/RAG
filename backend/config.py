@@ -90,3 +90,9 @@ POSTGRES_PORT=os.getenv("POSTGRES_PORT")
 POSTGRES_DB=os.getenv("POSTGRES_DB")
 POSTGRES_USER=os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD=os.getenv("POSTGRES_PASSWORD")
+
+# -- Auth -------------------------------------------------------------------
+JWT_SECRET_KEY     = os.getenv("JWT_SECRET_KEY", "change-this-secret-key")
+JWT_ALGORITHM      = "HS256"
+JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))  # 24 hours
+GOOGLE_CLIENT_ID   = os.getenv("GOOGLE_CLIENT_ID", "")

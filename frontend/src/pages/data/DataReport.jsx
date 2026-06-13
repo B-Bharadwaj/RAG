@@ -21,7 +21,9 @@ const mdComponents = {
 };
 
 export default function DataReport({ activeFileId, onFileSelect }) {
-  const [fileId, setFileId] = useState(activeFileId || "");
+  const [fileId, setFileId] = useState(
+  activeFileId || localStorage.getItem("ragbot_active_file_id") || ""
+);
   const [fileValid, setFileValid] = useState(null);
 
   const [summary, setSummary] = useState("");
