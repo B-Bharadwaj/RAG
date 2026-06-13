@@ -1,104 +1,42 @@
-# RAGBot — AI Business Intelligence Platform
+# RAG+ — AI Business Intelligence Platform
 
 > Built during GenAI Internship at Happiest Minds Technologies.
 > LangChain-free. Built from scratch. Powered by Groq.
-> **Live Demo:** [bharadwaj-ragbot.vercel.app](https://bharadwaj-ragbot.vercel.app)
+
 ---
 
 ## Overview
 
-RAGBot is a full-stack AI platform with two complete pipelines and JWT-based user authentication:
+RAG+ is a full-stack AI platform with two complete pipelines:
 
 - **PDF Mode** — Deep question answering over research papers and documents
-- **Data Mode** — Precise business intelligence over CSV and Excel files using Text-to-SQL
+- **Data Mode** — Precise business intelligence over CSV and Excel files
 
-Both pipelines are exposed through a FastAPI REST API and a React frontend with per-user data isolation.
-
----
-
-## System Architecture
-
-```
-+---------------------------------------------------------------------+
-|                         React Frontend                              |
-|  Auth: Login | Register | Google OAuth                              |
-|  PDF Mode:  Chat | Upload | Manage | Compare | Eval | Report        |
-|  Data Mode: Upload | Chat | Visualize | Report | Query Log          |
-+----------------------------+----------------------------------------+
-                             |  JWT Token (Bearer)
-+----------------------------v----------------------------------------+
-|                   FastAPI Backend (27 endpoints)                    |
-|   /api/auth -- Authentication    /api/v1 -- PDF RAG                 |
-|                                  /api/v2 -- Data BI                 |
-|                 JWT Middleware (all routes protected)               |
-+----------+------------------------------------+---------------------+
-           |                                    |
-+----------v---------+            +-------------v-------------------+
-|       SQLite       |            |          PostgreSQL             |
-|  PDF registry      |            |  users table                   |
-|  Chat history      |            |  business_files (per user)     |
-|  Eval scores       |            |  analysis_history (per user)   |
-+--------------------+            |  query_log (per user)          |
-                                  |  CSV/Excel data tables         |
-                                  +--------------------------------+
-                                             |
-                                  +----------v----------+
-                                  |    Groq LLM API     |
-                                  |  llama-3.3-70b      |
-                                  |  llama-3.1-8b       |
-                                  |  llama-4-scout      |
-                                  +---------------------+
-```
+Both pipelines are exposed through a FastAPI REST API and a React frontend.
 
 ---
 
-## PDF Mode Architecture
+## Architecture
 
 ```
-PDF Upload
-    |
-    +-- PyMuPDF text extraction (per page)
-    +-- Sentence-aware chunking (800 chars, 200 overlap)
-    +-- Per-figure extraction -> Groq Vision captioning
-    +-- MD5 dedup + cosine near-dedup (threshold 0.95)
-    +-- FAISS HNSW indexing (all chunks)
-    +-- BM25 indexing (per document)
-    +-- Metadata extraction (title, authors, abstract)
-
-User Question
-    |
-    +-- Standalone query resolution (via chat history)
-    +-- 3-variation LLM query expansion
-    +-- Hybrid search: FAISS HNSW + BM25 (parallel)
-    +-- Per-PDF search for multi-paper coverage
-    +-- Image chunk boosting (when diagram queries detected)
-    +-- Cross-encoder reranking (ms-marco-MiniLM-L-6-v2)
-    +-- Token budget trimming (3500 tokens max)
-    +-- Groq generation with scoped memory
-```
-
----
-
-## Data Mode Architecture
-
-```
-CSV/Excel Upload
-    |
-    +-- Pandas loading (all sheets)
-    +-- Load to PostgreSQL (pandas.to_sql)
-    +-- 5 SQL queries -> LLM generates business summary
-    +-- Register in business_files table (with user_id)
-
-User Question
-    |
-    +-- LLM reads PostgreSQL schema
-    +-- LLM generates precise SQL query
-    +-- SQL executes on PostgreSQL -> exact rows
-    +-- LLM converts rows to natural language answer
-    +-- Specific value detection ("Bangalore vs Pune")
-    +-- Chart SQL generated with WHERE IN filter
-    +-- Chart.js arrays returned to frontend
-    +-- Full chart data saved to analysis_history
+┌─────────────────────────────────────────────────────────────────┐
+│                         React Frontend                           │
+│   PDF Mode:  Chat | Upload | Manage | Compare | Eval | Report    │
+│   Data Mode: Upload | Chat | Visualize | Report | Query Log      │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│                FastAPI Backend (24 endpoints)                     │
+│            /api/v1 — PDF RAG      /api/v2 — Data BI              │
+└───────────────┬─────────────────────────────┬───────────────────┘
+                │                             │
+┌───────────────▼──────────┐   ┌─────────────▼────────────────────┐
+│          SQLite           │   │           PostgreSQL              │
+│  PDF registry             │   │  CSV/Excel data tables           │
+│  Chat history             │   │  Business file registry          │
+│  Eval scores              │   │  Analysis history                │
+└──────────────────────────┘   │  SQL query log                   │
+                                └──────────────────────────────────┘
 ```
 
 ---
@@ -113,80 +51,157 @@ User Question
 | Vector Store | FAISS HNSW |
 | Keyword Search | BM25 Okapi |
 | Backend | FastAPI + Pydantic |
-| Authentication | JWT (python-jose) + bcrypt + Google OAuth |
-| Databases | SQLite (PDF mode) + PostgreSQL (Data mode) |
+| Databases | SQLite + PostgreSQL |
 | Frontend | React + Chart.js |
 | PDF Processing | PyMuPDF + pypdf |
-| Data Processing | Pandas + SQLAlchemy |
-| Deployment | Hugging Face Spaces + Vercel + Supabase |
+| Data Processing | Pandas |
+
+---
+
+## PDF Mode
+
+### Retrieval Pipeline
+
+- Hybrid FAISS HNSW + BM25 Okapi retrieval running in parallel
+- Per-document BM25 indices for scoped single-paper search
+- Cross-encoder reranking — re-scores every candidate by reading full query and chunk together
+- 3-variation LLM query expansion to improve recall
+- MD5 exact-hash and cosine near-deduplication (threshold 0.95)
+- Conversation memory scoped per-PDF or globally
+
+### Document Processing
+
+- Sentence-aware text chunking with configurable size and overlap
+- Per-figure extraction using PyMuPDF — individual figure crops, not full pages
+- Groq Vision (llama-4-scout) captioning for each extracted figure
+- Figure captions stored as searchable chunks
+- Auto metadata extraction — title, authors, abstract from first page
+
+### Chat Features
+
+- Ask across all PDFs simultaneously or scope to a single paper
+- Multi-paper comparison across 2-3 papers with conflict detection
+- Figures rendered inline when diagram queries are detected
+- Source dropdown with page number and text preview per answer
+- Follow-up question suggestions after every answer
+
+### Evaluation Pipeline
+
+- On-demand scoring using a judge LLM (llama-3.3-70b)
+- Three metrics: Faithfulness, Answer Relevancy, Context Recall
+- Evaluation tab fully independent from chat memory
+- Failure analysis surfaces the dangerous RAG pattern: high faithfulness + low context recall
+
+### PDF Report Tab
+
+- On-demand paper summary generation with SQLite caching
+- Zero tokens wasted — summaries only generated when user requests them
+- Per-paper cards with title, authors, abstract, and summary
+- Chat history export as CSV
+
+---
+
+## Data Mode
+
+### Text-to-SQL Pipeline
+
+```
+User question
+      ↓
+LLM reads PostgreSQL schema
+      ↓
+LLM generates precise SQL query
+      ↓
+SQL runs on PostgreSQL → exact results
+      ↓
+LLM converts rows to natural language answer
+      ↓
+Chart generated if question is visual
+```
+
+Fallback to stats-based answer if SQL fails or returns NOT_SQL.
+
+### SQL-Driven Analytics
+
+- File summary: 5 analytical SQL queries run on upload → real insights with exact numbers
+- Anomaly detection: 4 SQL queries detect nulls, duplicates, outliers, suspicious patterns
+- Executive summary and full report generated entirely from SQL results
+- No Pandas statistics sent to the LLM anywhere
+
+### SQL Query Logging
+
+Every query logged with: original question, generated SQL, execution status, rows returned, timestamp.
+Full auditability — every answer traceable back to the exact SQL that produced it.
+
+### Chart Generation Pipeline
+
+```
+Natural language question
+      ↓
+Specific value detection ("Bangalore vs Pune")
+      ↓
+LLM generates SQL with WHERE IN filter
+      ↓
+SQL runs on PostgreSQL → exact filtered data
+      ↓
+Chart.js compatible arrays returned to frontend
+```
+
+- Grouped bar charts for cross-tabulation (e.g. "Bachelors vs Masters by Gender")
+- Manual chart builder with column value filter UI
+- Aggregation options: Count, Sum, Average, Min, Max
+- Supported chart types: bar, line, pie, histogram, scatter
 
 ---
 
 ## Project Structure
 
 ```
-RAGBot/
-+-- backend/
-|   +-- pipeline/
-|   |   +-- loader.py           -- PDF + CSV/Excel loading
-|   |   +-- chunker.py          -- sentence-aware text chunking
-|   |   +-- indexer.py          -- FAISS + BM25 indexing
-|   |   +-- retriever.py        -- hybrid search + reranking
-|   |   +-- ocr.py              -- Groq Vision figure captioning
-|   |   +-- processor.py        -- lightweight file metadata
-|   |   +-- db.py               -- SQLite operations (PDF mode)
-|   +-- generation/
-|   |   +-- generator.py        -- all LLM generation functions
-|   +-- services/
-|   |   +-- analyzer.py         -- Data Mode orchestration
-|   |   +-- auth_service.py     -- JWT creation + password hashing
-|   |   +-- chart_generator.py  -- SQL-driven chart pipeline
-|   |   +-- report_generator.py -- SQL-driven report generation
-|   |   +-- sql_engine.py       -- PostgreSQL operations
-|   |   +-- query_logger.py     -- query log wrapper
-|   +-- middleware/
-|   |   +-- auth_middleware.py  -- JWT verification dependency
-|   +-- routers/
-|   |   +-- auth.py             -- /api/auth endpoints
-|   |   +-- rag.py              -- /api/v1 PDF endpoints
-|   |   +-- analyzer.py         -- /api/v2 Data endpoints
-|   |   +-- sql.py              -- /api/v2 Query Log endpoints
-|   +-- eval/
-|   |   +-- run_eval.py         -- evaluation pipeline
-|   +-- models/
-|   |   +-- schemas.py          -- Pydantic request/response models
-|   +-- config.py               -- configuration + env vars
-|   +-- main.py                 -- FastAPI app entry point
-+-- frontend/
-    +-- src/
-        +-- pages/
-        |   +-- auth/           -- Login, Register
-        |   +-- pdf/            -- Chat, Upload, Manage, Compare, Eval, Report
-        |   +-- data/           -- Upload, Chat, Visualize, Report, QueryLog
-        +-- components/
-        |   +-- auth/           -- ProtectedRoute, GoogleButton
-        |   +-- shared/         -- TopNav, Sidebar, MarkdownContent
-        |   +-- data/           -- ChartRenderer, FileSelector
-        +-- context/
-        |   +-- AuthContext.jsx -- global auth state
-        +-- api/
-            +-- client.js       -- axios instance with JWT interceptor
+RAG_v3/
+├── backend/
+│   ├── pipeline/
+│   │   ├── loader.py           — PDF + CSV/Excel loading
+│   │   ├── chunker.py          — sentence-aware text chunking
+│   │   ├── indexer.py          — FAISS + BM25 indexing
+│   │   ├── retriever.py        — hybrid search + reranking
+│   │   ├── ocr.py              — Groq Vision figure captioning
+│   │   ├── processor.py        — lightweight file metadata
+│   │   └── db.py               — SQLite operations (PDF mode)
+│   ├── generation/
+│   │   └── generator.py        — all LLM generation functions
+│   ├── services/
+│   │   ├── analyzer.py         — Data Mode orchestration
+│   │   ├── chart_generator.py  — SQL-driven chart pipeline
+│   │   ├── report_generator.py — SQL-driven report generation
+│   │   ├── sql_engine.py       — PostgreSQL operations
+│   │   └── query_logger.py     — query log wrapper
+│   ├── routers/
+│   │   ├── rag.py              — /api/v1 PDF endpoints
+│   │   └── analyzer.py         — /api/v2 Data endpoints
+│   ├── eval/
+│   │   └── run_eval.py         — evaluation pipeline
+│   ├── models/
+│   │   └── schemas.py          — Pydantic request/response models
+│   ├── prompts.py              — all LLM prompts
+│   ├── config.py               — configuration
+│   └── main.py                 — FastAPI app entry point
+└── frontend/
+    └── src/
+        ├── pages/
+        │   ├── pdf/            — PDF Mode tabs
+        │   └── data/           — Data Mode tabs
+        ├── components/
+        │   ├── shared/         — TopNav, Sidebar, MarkdownContent
+        │   └── data/           — ChartRenderer, FileSelector
+        └── api/
+            └── client.js       — all API calls
 ```
 
 ---
 
 ## API Reference
 
-### Authentication -- `/api/auth`
-
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | /register | Register with email + password |
-| POST | /login | Login -> returns JWT token |
-| POST | /google | Google OAuth -> returns JWT token |
-| GET | /me | Get current user info |
-
-### PDF RAG -- `/api/v1` *(JWT required)*
+### PDF RAG — `/api/v1`
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -194,7 +209,6 @@ RAGBot/
 | POST | /chat | Ask a question |
 | POST | /compare | Compare 2-3 papers |
 | GET | /documents | List all indexed documents |
-| GET | /documents/{doc_id} | Get document info |
 | GET | /documents/{doc_id}/summary | On-demand summary with caching |
 | DELETE | /documents/{doc_id} | Delete document |
 | DELETE | /memory | Clear conversation memory |
@@ -204,7 +218,7 @@ RAGBot/
 | GET | /eval/results | Get eval scores and summary |
 | DELETE | /eval/results | Clear eval scores |
 
-### Business Intelligence -- `/api/v2` *(JWT required)*
+### Business Intelligence — `/api/v2`
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -216,10 +230,10 @@ RAGBot/
 | GET | /anomalies/{file_id} | SQL-driven anomaly detection |
 | GET | /report/{file_id} | Generate full SQL-driven report |
 | GET | /download/report/{report_id} | Download report as markdown |
-| GET | /files | List user's uploaded files |
+| GET | /files | List all uploaded files |
 | GET | /files/{file_id} | Get file info |
 | DELETE | /files/{file_id} | Delete file and PostgreSQL tables |
-| GET | /history/{file_id} | Q&A history with chart data |
+| GET | /history/{file_id} | Q&A history |
 | GET | /query-log | All SQL query logs |
 | GET | /query-log-summary | Aggregate query statistics |
 | DELETE | /query-log | Clear all logs |
@@ -234,8 +248,7 @@ RAGBot/
 Python 3.11+
 Node.js 18+
 PostgreSQL 14+
-Groq API key (https://console.groq.com)
-Google OAuth Client ID (optional)
+Groq API key
 ```
 
 ### Backend
@@ -245,19 +258,46 @@ cd backend
 python -m venv venv
 venv\Scripts\activate        # Windows
 source venv/bin/activate     # Mac/Linux
+
 pip install -r requirements.txt
 
 # Create storage directories
 mkdir -p storage/uploads storage/charts storage/reports storage/images
+
+# Copy and fill environment variables
+cp .env.example .env
+# Add your GROQ_API_KEY to .env
+
+# Start server
+uvicorn main:app --reload
 ```
 
 ### PostgreSQL Setup
 
 ```sql
 CREATE DATABASE ragbot;
+CREATE USER postgres WITH PASSWORD 'postgres';
+GRANT ALL PRIVILEGES ON DATABASE ragbot TO postgres;
 ```
 
-### Environment Variables
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### API Documentation
+
+```
+Swagger UI → http://localhost:8000/docs
+ReDoc      → http://localhost:8000/redoc
+```
+
+---
+
+## Environment Variables
 
 ```env
 GROQ_API_KEY=your_groq_api_key
@@ -267,42 +307,17 @@ POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=ragbot
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=your_password
+POSTGRES_PASSWORD=postgres
 
-# JWT Auth
-JWT_SECRET_KEY=your-random-secret-key-here
-JWT_EXPIRE_MINUTES=1440
+# Models
+GROQ_MODEL_NAME=llama-3.1-8b-instant
+GROQ_MODEL_LARGE=llama-3.3-70b-versatile
+GROQ_MODEL_SMALL=llama-3.1-8b-instant
 
-# Google OAuth (optional)
-GOOGLE_CLIENT_ID=your-google-client-id
-```
-
-### Start Backend
-
-```bash
-uvicorn main:app --host 127.0.0.1 --port 8000
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm start
-```
-
-### Frontend Environment Variables
-
-```env
-REACT_APP_API_URL=http://localhost:8000
-REACT_APP_GOOGLE_CLIENT_ID=your-google-client-id
-```
-
-### API Documentation
-
-```
-Swagger UI -> http://localhost:8000/docs
-ReDoc      -> http://localhost:8000/redoc
+# Storage
+UPLOADS_DIR=storage/uploads
+CHARTS_DIR=storage/charts
+REPORTS_DIR=storage/reports
 ```
 
 ---
@@ -313,16 +328,13 @@ ReDoc      -> http://localhost:8000/redoc
 Built from scratch to understand every component — retrieval, reranking, generation, evaluation. Full control over the pipeline with no hidden abstractions.
 
 **Why dual database?**
-PDF mode needs fast key-value lookups — SQLite is perfect. Data mode needs SQL queries on structured tabular data — PostgreSQL is the right tool.
+PDF mode needs fast key-value lookups — SQLite is perfect. Data mode needs SQL queries on structured tabular data — PostgreSQL is the right tool. Mixing them would create unnecessary coupling.
 
 **Why Text-to-SQL instead of RAG for structured data?**
 RAG on tabular data gives approximate answers from statistical summaries. SQL on the actual data gives exact answers. For business intelligence, precision matters.
 
-**Why JWT over session-based auth?**
-Stateless — works perfectly with Hugging Face Spaces which can restart at any time. No server-side session storage needed.
-
 **Why Chart.js over Plotly?**
-Lighter bundle, simpler API, better React integration, and full control over styling. Plotly JSON is complex to serialize cleanly through a REST API.
+Lighter bundle, simpler API, better React integration, and full control over styling. Plotly's JSON format is complex and hard to serialize cleanly through a REST API.
 
 ---
 
@@ -336,10 +348,7 @@ Lighter bundle, simpler API, better React integration, and full control over sty
 - [Chart.js](https://www.chartjs.org) — charts
 - [PostgreSQL](https://www.postgresql.org) — structured data
 - [PyMuPDF](https://pymupdf.readthedocs.io) — PDF processing
-- [Supabase](https://supabase.com) — cloud PostgreSQL
-- [Hugging Face Spaces](https://huggingface.co/spaces) — backend deployment
-- [Vercel](https://vercel.com) — frontend deployment
 
 ---
 
-*Happiest Minds Technologies — GenAI Internship 2026*
+*Happiest Minds Technologies — GenAI Internship 2025*
