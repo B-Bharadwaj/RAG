@@ -37,9 +37,16 @@ def init_db():
                 chunk_count   INTEGER DEFAULT 0,
                 uploaded_at   TEXT NOT NULL,
                 pdf_metadata  TEXT DEFAULT '{}',
-                pdf_summary   TEXT DEFAULT ''
+                pdf_summary   TEXT DEFAULT '',
+                user_id       TEXT DEFAULT ''
             )
         """)
+        try:
+            conn.execute(
+                "ALTER TABLE documents ADD COLUMN user_id TEXT DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass
         # Migrations - safe on existing DBs
         for col, default in [
             ("pdf_metadata", "'{}'"),
@@ -59,9 +66,17 @@ def init_db():
                 query     TEXT NOT NULL,
                 answer    TEXT NOT NULL,
                 scope     TEXT NOT NULL DEFAULT 'All PDFs',
-                asked_at  TEXT NOT NULL
+                asked_at  TEXT NOT NULL,
+                user_id   TEXT DEFAULT ''
             )
         """)
+        # Migration for existing table
+        try:
+            conn.execute(
+                "ALTER TABLE question_history ADD COLUMN user_id TEXT DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass
 
         # -- Feedback table -------------------------------------------------
         conn.execute("""
@@ -91,6 +106,7 @@ def register_document(
     filename: str,
     page_count: int,
     chunk_count: int,
+    user_id: str = "",
 ):
     uploaded_at = datetime.now(timezone.utc).isoformat()
     with _connect() as conn:
@@ -98,10 +114,10 @@ def register_document(
             """
             INSERT INTO documents
               (doc_id, filename, page_count, chunk_count,
-               uploaded_at, pdf_metadata, pdf_summary)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+               uploaded_at, pdf_metadata, pdf_summary, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (doc_id, filename, page_count, chunk_count, uploaded_at, "{}", ""),
+            (doc_id, filename, page_count, chunk_count, uploaded_at, "{}", "", user_id),
         )
         conn.commit()
 
@@ -132,11 +148,17 @@ def get_document_summary(doc_id: str) -> str:
     return row["pdf_summary"] if row and row["pdf_summary"] else ""
 
 
-def get_all_documents() -> list[dict]:
+def get_all_documents(user_id: str = "") -> list[dict]:
     with _connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM documents ORDER BY uploaded_at DESC"
-        ).fetchall()
+        if user_id:
+            rows = conn.execute(
+                "SELECT * FROM documents WHERE user_id = ? ORDER BY uploaded_at DESC",
+                (user_id,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM documents ORDER BY uploaded_at DESC"
+            ).fetchall()
     results = []
     for row in rows:
         d = dict(row)
@@ -169,11 +191,17 @@ def delete_document(doc_id: str):
         conn.commit()
 
 
-def filename_exists(filename: str) -> bool:
+def filename_exists(filename: str, user_id: str = "") -> bool:
     with _connect() as conn:
-        row = conn.execute(
-            "SELECT 1 FROM documents WHERE filename = ?", (filename,)
-        ).fetchone()
+        if user_id:
+            row = conn.execute(
+                "SELECT 1 FROM documents WHERE filename = ? AND user_id = ?",
+                (filename, user_id)
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT 1 FROM documents WHERE filename = ?", (filename,)
+            ).fetchone()
     return row is not None
 
 
@@ -181,25 +209,31 @@ def filename_exists(filename: str) -> bool:
 # Question history
 # ---------------------------------------------------------------------------
 
-def save_question(query: str, answer: str, scope: str):
+def save_question(query: str, answer: str, scope: str, user_id: str = ""):
     asked_at = datetime.now(timezone.utc).isoformat()
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO question_history (query, answer, scope, asked_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO question_history (query, answer, scope, asked_at, user_id)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (query, answer, scope, asked_at),
+            (query, answer, scope, asked_at, user_id),
         )
         conn.commit()
 
 
-def get_question_history(limit: int = 20) -> list[dict]:
+def get_question_history(limit: int = 20, user_id: str = "") -> list[dict]:
     with _connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM question_history ORDER BY asked_at ASC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        if user_id:
+            rows = conn.execute(
+                "SELECT * FROM question_history WHERE user_id = ? ORDER BY asked_at ASC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM question_history ORDER BY asked_at ASC LIMIT ?",
+                (limit,),
+            ).fetchall()
     return [dict(row) for row in rows]
 
 
@@ -308,19 +342,33 @@ def get_eval_scores(limit: int = 200) -> list[dict]:
     return results
 
 
-def get_recent_queries(limit: int = 20) -> list[dict]:
+def get_recent_queries(limit: int = 20, user_id: str = "") -> list[dict]:
     with _connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT qh.* FROM question_history qh
-            WHERE qh.query NOT IN (
-                SELECT query FROM eval_scores
-            )
-            ORDER BY qh.asked_at DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
+        if user_id:
+            rows = conn.execute(
+                """
+                SELECT qh.* FROM question_history qh
+                WHERE qh.query NOT IN (
+                    SELECT query FROM eval_scores
+                )
+                AND qh.user_id = ?
+                ORDER BY qh.asked_at DESC
+                LIMIT ?
+                """,
+                (user_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT qh.* FROM question_history qh
+                WHERE qh.query NOT IN (
+                    SELECT query FROM eval_scores
+                )
+                ORDER BY qh.asked_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
     return [dict(row) for row in rows]
 
 

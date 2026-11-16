@@ -126,7 +126,7 @@ async def upload_pdf(file: UploadFile = File(...), current_user: dict = Depends(
             raise HTTPException(status_code=400, detail=str(e))
 
         # Check duplicate
-        if filename_exists(file.filename):
+        if filename_exists(file.filename, user_id=current_user["user_id"]):
             doc = next(
                 (d for d in get_all_documents() if d["filename"] == file.filename),
                 None
@@ -153,7 +153,7 @@ async def upload_pdf(file: UploadFile = File(...), current_user: dict = Depends(
         # Index
         all_docs = clean_documents(text_docs + image_docs)
         add_to_index(all_docs)
-        register_document(doc_id, file.filename, page_count, len(all_docs))
+        register_document(doc_id, file.filename, page_count, len(all_docs), user_id=current_user["user_id"])
 
         # Metadata
         first_page = pages_text[0][1] if pages_text else ""
@@ -201,7 +201,7 @@ async def chat(request: ChatRequest, current_user: dict = Depends(get_current_us
             doc_id=request.doc_id,
         )
 
-        save_question(request.query, answer, request.doc_id or "All PDFs")
+        save_question(request.query, answer, request.doc_id or "All PDFs", user_id=current_user["user_id"])
 
         # Format sources for API response
         formatted_sources = []
@@ -273,7 +273,7 @@ async def compare(request: CompareRequest, current_user: dict = Depends(get_curr
 @router.get("/documents")
 async def list_documents(current_user: dict = Depends(get_current_user)):
     """List all indexed PDF documents with metadata."""
-    docs = get_all_documents()
+    docs = get_all_documents(user_id=current_user["user_id"])
     result = []
     for d in docs:
         meta = d.get("pdf_metadata") or {}
@@ -393,7 +393,7 @@ async def clear_memory(current_user: dict = Depends(get_current_user)):
 @router.get("/history")
 async def get_history(limit: int = 20, current_user: dict = Depends(get_current_user)):
     """Get recent chat history."""
-    history = get_question_history(limit=limit)
+    history = get_question_history(limit=limit, user_id=current_user["user_id"])
     return {"total": len(history), "history": history}
 
 # @router.delete("/history")
@@ -420,7 +420,7 @@ async def score_queries(request: EvalRequest, current_user: dict = Depends(get_c
     """
     try:
         from eval.run_eval import run_on_recent_queries
-        results = run_on_recent_queries(n=request.n)
+        results = run_on_recent_queries(n=request.n, user_id=current_user["user_id"])
 
         if not results:
             return {

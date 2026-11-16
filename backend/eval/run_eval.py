@@ -82,9 +82,9 @@ def run_on_test_set(path: str = "eval/test_set.json", delay: float = 6.0):
     return results
 
 
-def run_on_recent_queries(n: int = 10, delay: float = 6.0):
+def run_on_recent_queries(n: int = 10, delay: float = 6.0, user_id: str = ""):
     """Score the last N chat queries that haven't been evaluated yet."""
-    recent = get_recent_queries(limit=n)
+    recent = get_recent_queries(limit=n, user_id=user_id)
 
     if not recent:
         print("[run_eval] No un-scored queries found in question_history.")

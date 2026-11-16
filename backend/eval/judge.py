@@ -22,7 +22,7 @@ from config import GROQ_API_KEY
 _client = Groq(api_key=GROQ_API_KEY)
 
 # Use the big judge model - different from the 8b generator
-JUDGE_MODEL = "llama-3.3-70b-versatile"
+JUDGE_MODEL = "openai/gpt-oss-120b"
 
 _JUDGE_PROMPT = """\
 You are an expert RAG evaluation judge. Score the response below across 3 dimensions.
