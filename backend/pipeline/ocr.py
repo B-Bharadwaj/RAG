@@ -13,7 +13,8 @@ import base64
 import io
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from groq import Groq
+#from groq import Groq
+from openai import OpenAI
 from config import GROQ_API_KEY, GROQ_VISION_MODEL, OCR_MAX_WORKERS
 
 client = Groq(api_key=GROQ_API_KEY)

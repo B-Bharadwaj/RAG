@@ -38,10 +38,11 @@ MAX_PAGE_COUNT      = int(os.getenv("MAX_PAGE_COUNT",   "100"))
 MAX_REQUESTS_PER_MINUTE = int(os.getenv("MAX_REQUESTS_PER_MINUTE", "20"))
 
 # -- Model Names ------------------------------------------------------------
-GROQ_MODEL_NAME     = "llama-3.1-8b-instant"           # generation (fast)
-GROQ_MODEL_LARGE    = "llama-3.3-70b-versatile"        # complex Q&A, anomaly detection
-GROQ_MODEL_SMALL    = "llama-3.1-8b-instant"           # summaries, simple tasks
-GROQ_VISION_MODEL   = "meta-llama/llama-4-scout-17b-16e-instruct"
+# -- Model Names ------------------------------------------------------------
+GROQ_MODEL_NAME     = "openai/gpt-oss-20b"       # generation (fast)
+GROQ_MODEL_LARGE    = "openai/gpt-oss-120b"      # complex Q&A, anomaly detection
+GROQ_MODEL_SMALL    = "openai/gpt-oss-20b"       # summaries, simple tasks
+GROQ_VISION_MODEL   = "qwen/qwen3.8-27b"         # figure captioning
 EMBED_MODEL_NAME    = "all-MiniLM-L6-v2"
 RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
