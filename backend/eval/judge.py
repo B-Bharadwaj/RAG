@@ -15,6 +15,7 @@ Context recall - the chunks contain enough info to answer the question.
 """
 
 import json
+import re
 import time
 from groq import Groq
 from config import GROQ_API_KEY
@@ -69,7 +70,7 @@ def score(
     query: str,
     answer: str,
     chunk_texts: list[str],
-    retries: int = 2,
+    retries: int = 3,
 ) -> dict:
     """
     Call the judge LLM and return a score dict.
@@ -87,23 +88,23 @@ def score(
     )
 
     for attempt in range(retries):
+        raw = ""
         try:
             response = _client.chat.completions.create(
                 model=JUDGE_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=300,
-                temperature=0.0,   # deterministic scoring
+                max_tokens=2000,           # room for reasoning + JSON
+                temperature=0.0,
+                reasoning_effort="low",    # keep thinking short
             )
-            raw = response.choices[0].message.content.strip()
+            raw = (response.choices[0].message.content or "").strip()
 
-            # Strip accidental markdown fences
-            if raw.startswith("```"):
-                parts = raw.split("```")
-                raw = parts[1] if len(parts) > 1 else raw
-                if raw.startswith("json"):
-                    raw = raw[4:]
+            # Pull out the JSON object even if wrapped in text or fences
+            match = re.search(r"\{.*\}", raw, re.DOTALL)
+            if not match:
+                raise json.JSONDecodeError("no JSON object found", raw, 0)
 
-            result = json.loads(raw.strip())
+            result = json.loads(match.group(0))
 
             return {
                 "faithfulness":   round(float(result.get("faithfulness",   0.0)), 3),
@@ -121,12 +122,11 @@ def score(
             err = str(e).lower()
             if "rate limit" in err or "429" in err:
                 wait = 15 * (attempt + 1)
-                print(f"[JUDGE] Rate limited, waiting {wait}s ")
+                print(f"[JUDGE] Rate limited, waiting {wait}s")
                 time.sleep(wait)
             else:
                 print(f"[JUDGE] Unexpected error (attempt {attempt+1}): {e}")
                 time.sleep(5)
-
     # Safe fallback - never crash the UI
     return {
         "faithfulness":   -1.0,
